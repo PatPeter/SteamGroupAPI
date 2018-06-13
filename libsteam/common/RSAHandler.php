@@ -1,4 +1,6 @@
 <?php
+namespace libsteam\common;
+
 // Stevish RSA version 2.1
 
 // Copyright 2009, Stevish.com (with mad props to te developers of the PEAR RSA extension)
@@ -18,7 +20,7 @@
 // $decrypted = $RSA->decrypt($encrypted, $keys[1]);
 // echo $decrypted; //Will print Peter Piper picked a peck of pickled peppers
 
-class RSA_Handler {
+class RSAHandler {
 	function encrypt($text, $key) {
 		list($p, $r, $keysize) = unserialize(base64_decode($key));
 		$in = $this->blockify($text, $keysize);
@@ -361,4 +363,3 @@ class RSA_keymaker {
 		return $result;
 	}
 }
-?>

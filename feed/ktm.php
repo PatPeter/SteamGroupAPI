@@ -1,6 +1,6 @@
 <?php
-require('../cfeed.php');
+require('../Autoloader.php');
 
-$feed = new Feed("cssktm","ktm");
+$feed = new \libsteam\group\history\Feed("cssktm","ktm");
 $feed->PrintRSS(30);
 ?>

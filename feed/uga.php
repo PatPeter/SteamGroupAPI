@@ -1,6 +1,6 @@
 <?php
-require('../cfeed.php');
+require('../Autoloader.php');
 
-$feed = new Feed('unigamia','uga');
-$feed->PrintRSS(30);
+$feed = new \libsteam\group\history\Feed('unigamia','uga');
+//$feed->PrintRSS(30);
 ?>

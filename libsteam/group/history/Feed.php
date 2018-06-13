@@ -1,49 +1,15 @@
 <?php
-require('libsteam.php');
-require('steambase.php');
-require('rsa.php');
+namespace libsteam\group\history;
 
-class HistoryItem {
-	public $id;
-	public $img;
-	public $title;
-	public $date;
-	public $source = '';
-	public $source_url = '';
-	public $target = '';
-	public $target_url = '';
-	
-	public function unsetall() {
-		unset($this->id);
-		unset($this->img);
-		unset($this->title);
-		unset($this->date);
-		$this->source     = '';
-		$this->source_url = '';
-		$this->target     = '';
-		$this->target_url = '';
-	}
-	
-	public function __toString() {
-		$return = "( '$this->id', '$this->img', '$this->title', '$this->date', '$this->source', '$this->source_url', ";
-		if ($this->target != '')
-			if ($this->target_url != '')
-				if ($this->target_url != "NULL")
-					$return .= "'$this->target', '$this->target_url' )";
-				else
-					$return .= "'$this->target', NULL )";
-			else
-				$return .= "'$this->target', NULL )";
-		else
-			$return .= 'NULL, NULL )';
-		return $return;
-	}
-}
+use libsteam\common\Core;
+use libsteam\common\SteamBase;
+use libsteam\common\RSAHandler;
 
 class Feed {
-	const offset = 2; // Offset for the time zone cURL fetches
-	const br = "<br />\n";
-	const prefix = "[libsteam] ";
+	const OFFSET = 2; // Offset for the time zone cURL fetches
+	const BR = "<br />\n";
+	const PREFIX = "[libsteam] ";
+	const USER_AGENT = 'libsteam';
 	
 	private $authcode  = ""; // For "enter your code here"
 	
@@ -56,14 +22,14 @@ class Feed {
 	 * Program Modified Connection Variables
 	 * 
 	 */
+	/* @var $connection \MySQLi */
 	private $connection;
 	private $group = '';
 	private $table = '';
-	private $sb = '';
+	//private $sb = '';
 	
-	private $curlid = null;
+	private $curlID = null;
 	private $options = null;
-	private $useragent = "";
 	
 	/**
 	 * 
@@ -176,90 +142,103 @@ class Feed {
 	 * @param $group The group's short URL.
 	 * @param $table The table to store and call data from.
 	 */
-	public function Feed($group,$table) {
-		$this->sb = new SteamBase();
-		$this->useragent = self::prefix . "Spider for Steam group history RSS feed";
+	public function __construct($group,$table) {
+		$this->useragent = self::PREFIX . "Spider for Steam group history RSS feed";
 		
 		if ($group != null && $table != null) {
 			/**
 			 * Set MySQL Variables
 			 */
-			$this->connection = new mysqli($this->sb->host,$this->sb->username,$this->sb->password)
-				or exit(self::prefix . "Cound not establish a connection to the database. " . 
-					"Please check your settings." . self::br);
+			$this->connection = new \mysqli(SteamBase::HOST, SteamBase::USERNAME, SteamBase::PASSWORD)
+				or exit(self::PREFIX . "Cound not establish a connection to the database. " . 
+					"Please check your settings." . self::BR);
 			$this->group = $group;
 			$this->table = $table;
-			$this->CheckDatabase();
+			$this->checkDatabase();
 			
-			$rsakey = $this->getRSAKey();
 			
 			#echo base64_decode($rsakey->publickey_mod);
 			
-			$rsa = new RSA_Handler();
-			$cpassword = $rsa->encrypt($this->sb->steampass, $rsakey->publickey_mod);
+			$rsaKey = $this->getRSAKey();
+			if ($rsaKey == null) {
+				exit(self::PREFIX . 'RSA not retrieved. Cannot continue.');
+			}
+			
+			$rsa = new RSAHandler();
+			$cpassword = $rsa->encrypt(SteamBase::STEAM_PASSWORD, $rsaKey->publickey_mod);
 			
 			/**
 			 * Set cURL Variables and Initialize Cookies
 			 */
-			$this->curlid = curl_init();
+			$this->curlID = curl_init();
 			$this->options = array(
-				CURLOPT_URL            => "https://steamcommunity.com/login/dologin/",
-				CURLOPT_COOKIEJAR      => "/tmp/cookies.txt",
+				CURLOPT_URL            => 'https://steamcommunity.com/login/dologin/',
+				//CURLOPT_COOKIEJAR      => 'C:\Windows\Temp',
 				CURLOPT_RETURNTRANSFER => 1,      // return web page
 				CURLOPT_HEADER         => false, // Do not return headers
 				CURLOPT_FOLLOWLOCATION => true,  // follow redirects
 				CURLOPT_POST           => 1,
 				CURLOPT_POSTFIELDS     => "password=" . $cpassword . 
-										  "&username=" . $this->sb->steamuser . 
+										  "&username=" . SteamBase::STEAM_USERNAME . 
 										  "&captchagid=-1" . 
-										  "&rsatimestamp=" . $rsakey->timestamp,
+										  "&rsatimestamp=" . $rsaKey->timestamp,
 				CURLOPT_SSL_VERIFYPEER => true,
 				CURLOPT_SSL_VERIFYHOST => 2,
-				CURLOPT_USERAGENT      => $this->useragent,
+				CURLOPT_USERAGENT      => self::USER_AGENT,
 				CURLOPT_AUTOREFERER    => true
 			);
-			curl_setopt_array($this->curlid,$this->options);
+			curl_setopt_array($this->curlID,$this->options);
 			// Execute Opt Array to create cookies
-			echo curl_exec($this->curlid);
-			$loghead = curl_getinfo($this->curlid);
-			$loghead['errno']   = curl_errno($this->curlid);
-			$loghead['errmsg']  = curl_error($this->curlid);
+			echo curl_exec($this->curlID);
+			$loghead = curl_getinfo($this->curlID);
+			$loghead['errno']   = curl_errno($this->curlID);
+			$loghead['errmsg']  = curl_error($this->curlID);
 			#$loghead['content'] = $login;
 			#print_r($loghead);
 		}
 	}
 	
+	public function __destruct() { }
+	
+	public function __toString() {
+		echo self::PREFIX . "Feed Exists!" . self::BR;
+	}
+	
 	private function getRSAKey() {
-		$curlid = curl_init();
+		$curlID = curl_init();
 		$options = array(
-			CURLOPT_URL            => "https://steamcommunity.com/login/getrsakey/",
-			CURLOPT_COOKIEJAR      => "/tmp/cookies.txt",
+			CURLOPT_URL            => 'https://steamcommunity.com/login/getrsakey/',
+			//CURLOPT_COOKIEJAR      => '%TMP%',
 			CURLOPT_RETURNTRANSFER => 1,
 			CURLOPT_HEADER         => false,
 			CURLOPT_FOLLOWLOCATION => false,
 			CURLOPT_POST           => 1,
-			CURLOPT_POSTFIELDS     => "username=" . $this->sb->steamuser,
+			CURLOPT_POSTFIELDS     => "username=" . SteamBase::STEAM_USERNAME,
 			CURLOPT_SSL_VERIFYPEER => true,
 			CURLOPT_SSL_VERIFYHOST => 2,
-			CURLOPT_USERAGENT      => $this->useragent,
+			CURLOPT_USERAGENT      => self::USER_AGENT,
 			CURLOPT_AUTOREFERER    => false
 		);
-		curl_setopt_array($curlid,$options);
-		$json = curl_exec($curlid);
+		curl_setopt_array($curlID,$options);
+		$json = curl_exec($curlID);
+		$loghead = curl_getinfo($curlID);
+		print_r($json);
+		print_r($loghead);
+		if (curl_errno($curlID) != 0) {
+			die(self::PREFIX . curl_error($curlID));
+		}
 		return json_decode($json);
 	}
 	
-	public function __destruct() { }
-	
-	public function __toString() {
-		echo self::prefix . "Feed Exists!" . self::br;
+	public function doLogin() {
+		
 	}
 	
-	public function CheckDatabase() {
-		if ($this->connection->select_db($this->sb->database)) {
+	public function checkDatabase() {
+		if ($this->connection->select_db(SteamBase::DATABASE)) {
 			// To-do: Remove title.
 			$this->connection->query(
-				"CREATE TABLE IF NOT EXISTS `" . $this->sb->database . "`.`$this->table` (
+				"CREATE TABLE IF NOT EXISTS `" . SteamBase::DATABASE . "`.`$this->table` (
 					`id`          MEDIUMINT     NOT NULL ,
 					`type`        TINYINT       NOT NULL ,
 					`title`       VARCHAR( 32 ) NOT NULL ,
@@ -272,12 +251,12 @@ class Feed {
 				) ENGINE = MYISAM
 				CHARACTER SET utf8 COLLATE utf8_unicode_ci
 				COMMENT = 'RSS History for the " . strtoupper($this->table) . ", Steam group /$this->group/.';")
-			or exit(self::prefix . "You cannot make the table to store your group's history." . self::br);
+			or exit(self::PREFIX . "You cannot make the table to store your group's history." . self::BR);
 		} else {
 			$this->connection->query(
-				"CREATE DATABASE IF NOT EXISTS `$this->sb->database` " . 
-					"DEFAULT CHARACTER SET utf8 COLLATE utf8_bin",$this->connection)
-			or exit(self::prefix . "You cannot make the database!" . self::br);
+				"CREATE DATABASE IF NOT EXISTS `" . SteamBase::DATABASE . "` " . 
+					"DEFAULT CHARACTER SET utf8 COLLATE utf8_bin")
+			or exit(self::PREFIX . "You cannot make the database!" . self::BR);
 		}
 	}
 	
@@ -338,12 +317,12 @@ class Feed {
 	 */
 	public function InputCurrent() {
 		$start_time = time();
-		echo "Started timer." . self::br;
+		echo "Started timer." . self::BR;
 		
 		$pages = $this->GetLastPage();
 		if ($pages == 0) {
 			echo "Could not fetch the number of pages: $pages";
-			curl_close($this->curlid);
+			curl_close($this->curlID);
 			$this->connection->close();
 			$this->__destruct();
 			return;
@@ -352,7 +331,7 @@ class Feed {
 		$id = $this->GetItemCount();
 		if ($id == 0) {
 			echo "Could not fetch the number of history items: $id";
-			curl_close($this->curlid);
+			curl_close($this->curlID);
 			$this->connection->close();
 			$this->__destruct();
 			return;
@@ -370,12 +349,12 @@ class Feed {
 			$page = 1;
 			$history_item = new HistoryItem();
 			while ($page <= $pages) {
-				echo "Parsing page $page." . self::br;
+				echo "Parsing page $page." . self::BR;
 				$this->ParsePage($page,$id,$history_item);
 				$page++;
 			}
 		} else {
-			echo "Table not empty, cannot input data." . self::br;
+			echo "Table not empty, cannot input data." . self::BR;
 		}
 		$end_time = time();
 		date_default_timezone_set("America/Chicago");
@@ -383,7 +362,7 @@ class Feed {
 		echo "Parsing the Steam group history page and inserting it into the database took " . date("H:i:s",$end_time - $start_time - 62167197600) . ".";
 
 		mysql_close($this->connection);
-		curl_close($this->curlid);
+		curl_close($this->curlID);
 	}
 	
 	/**
@@ -397,8 +376,8 @@ class Feed {
 	}
 	
 	private function ParsePage($page,&$id,&$history_item) { // http://www.php.net/manual/en/language.references.pass.php
-		curl_setopt($this->curlid, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group . "/history?p=" . $page);
-		$content = curl_exec($this->curlid);
+		curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group . "/history?p=" . $page);
+		$content = curl_exec($this->curlID);
 		//echo $content;
 		
 		$items = explode('<',$content);
@@ -426,7 +405,7 @@ class Feed {
 					// increase stack and add the item
 					if (/*$segment >= 0 && */$segment !== false) {
 						$stack++;
-						//echo $item . self::br;
+						//echo $item . self::BR;
 						$output .= "<" . $item;
 					}
 				}
@@ -472,19 +451,19 @@ class Feed {
 			$section = strip_tags($section,'<a>');
 			$section = explode("\r\n",$section);
 			$history_item->title = addslashes(trim($section[0]));
-			$history_item->date = addslashes($this->ConvertSteamDate(trim($section[2])));
+			$history_item->date = addslashes($this->convertSteamDate(trim($section[2])));
 			$desc = trim($section[4]);
-			//echo $desc . self::br;
+			//echo $desc . self::BR;
 			
 			// Get the source, source url, target, and target url
 			if (in_array($history_item->title,$this->double)) {
 				$first = $this->SetNameAndURL($history_item,$desc,"target",0);
 				$this->SetNameAndURL($history_item,$desc,"source",$first);
-				//echo $second[2] . self::br;
+				//echo $second[2] . self::BR;
 				//$history_item->desc = addslashes($second[2]);
 			} else {
 				$first = $this->SetNameAndURL($history_item,$desc,"source",strpos($desc,"<a"));
-				//echo $first[2] . self::br;
+				//echo $first[2] . self::BR;
 				//$history_item->desc = addslashes($first[2]);
 			}
 			
@@ -503,7 +482,7 @@ class Feed {
 			 */
 			
 			echo $history_item;
-			echo "\n" . self::br;
+			echo "\n" . self::BR;
 		}
 	}
 	
@@ -516,7 +495,7 @@ class Feed {
 	 * @param name         Source or Target for saving into history_item
 	 * @param offset          
 	 */
-	private function SetNameAndURL(&$history_item,$desc,$name,$offset) {
+	private function SetNameAndURL(&$history_item, $desc, $name, $offset) {
 		$name_url = $name . "_url";
 		if (in_array($history_item->title,$this->events) && $offset == 0) {
 			$quote = strpos($desc,"\""); // Find the first quotation mark around the event
@@ -530,8 +509,8 @@ class Feed {
 			$endquote = strpos($desc,"\"",$quote + 6);
 			$item = substr($desc,$quote + 6,$endquote - ($quote + 6));
 			if (strpos($desc,"/id/") !== false) {
-				$converter = new steam_tools();
-				$item = $converter->convert_community_id($item);
+				$converter = new Core();
+				$item = $converter->convertCommunityID($item);
 				unset($converter);
 			} else {
 				$item = explode("/",$item);
@@ -556,8 +535,8 @@ class Feed {
 	 * @return $pages Number of pages for group history
 	 */
 	private function GetLastPage() {
-		curl_setopt($this->curlid, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
-		$content = curl_exec($this->curlid);
+		curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
+		$content = curl_exec($this->curlID);
 		$pages = 0;
 		$segment = strpos($content,'pageLinks');
 		if ($segment === false) {
@@ -616,8 +595,8 @@ class Feed {
 	 * @return The number of history items reported by the page.
 	 */
 	private function GetItemCount() {
-		curl_setopt($this->curlid, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
-		$content = curl_exec($this->curlid);
+		curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
+		$content = curl_exec($this->curlID);
 		$location = strpos($content,'History Items');
 		
 		$end = $location - 1;
@@ -642,7 +621,7 @@ class Feed {
 	 * @param $date The date in Steam's format, trimmed
 	 * @return The date in ISO 8601 format
 	 */
-	private function ConvertSteamDate($steamdate) {
+	private function convertSteamDate($steamdate) {
 		//echo $steamdate . "<br />\n";
 		// Start with year
 		$date = $this->year . "-";
@@ -693,7 +672,7 @@ class Feed {
 		elseif ($meridian == "am" && $time[0] == 12)
 			$time[0] -= 12;
 		//echo $time[0] . "<br />\n";
-		$time[0] += self::offset; // Add the hour offset that cURL has
+		$time[0] += self::OFFSET; // Add the hour offset that cURL has
 		if ((int) $time[0] >= 24)
 			$time[0] -= 24; // If the hour offset goes over 24
 		elseif ((int) $time[0] < 10)
@@ -707,9 +686,3 @@ class Feed {
 		return $date;
 	}
 }
-
-if (isset($_GET['id'])) {
-	$feed = new Feed("unigamia","uga");
-	$feed->InputCurrent();
-}
-?>
