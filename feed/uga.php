@@ -1,6 +1,6 @@
 <?php
 require('../cfeed.php');
 
-$feed = new feed('unigamia','uga');
-$feed->main(30);
+$feed = new Feed('unigamia','uga');
+$feed->PrintRSS(30);
 ?>

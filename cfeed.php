@@ -1,7 +1,9 @@
 <?php
 require('libsteam.php');
+require('steambase.php');
+require('rsa.php');
 
-class history_item {
+class HistoryItem {
 	public $id;
 	public $img;
 	public $title;
@@ -16,13 +18,6 @@ class history_item {
 		unset($this->img);
 		unset($this->title);
 		unset($this->date);
-		//unset($this->source);
-		//unset($this->source_url);
-		/*$this->id         = '';
-		$this->img        = '';
-		$this->title      = '';
-		$this->date       = '';
-		$this->desc       = '';*/
 		$this->source     = '';
 		$this->source_url = '';
 		$this->target     = '';
@@ -45,26 +40,17 @@ class history_item {
 	}
 }
 
-class feed {
+class Feed {
 	const offset = 2; // Offset for the time zone cURL fetches
+	const br = "<br />\n";
+	const prefix = "[libsteam] ";
 	
-	/**
-	 * 
-	 * MySQL and Steam Account User Information
-	 * 
-	 */
-	private $host      = 'localhost';
-	private $username  = '';
-	private $password  = '';
-	private $database  = 'rss';
+	private $authcode  = ""; // For "enter your code here"
 	
-	private $steamuser = ''; // Username for Steam
-	private $steampass = ''; // Password for Steam
+	#private $users     = array(
+	#							"" => ""
+	#					 );
 	
-	private $users     = array(
-								"" => ""
-							);
-	private $authenticated = false;
 	/**
 	 * 
 	 * Program Modified Connection Variables
@@ -73,30 +59,33 @@ class feed {
 	private $connection;
 	private $group = '';
 	private $table = '';
+	private $sb = '';
 	
 	private $curlid = null;
 	private $options = null;
+	private $useragent = "";
 	
 	/**
 	 * 
 	 * Date Variables
 	 * 
 	 */
-	private $year   = 2010;
+	private $year   = 2012;
 	private $month  = '';
-	private $months = array('January' => '01',
-								'February' => '02',
-								'March' => '03',
-								'April' => '04',
-								'May' => '05',
-								'June' => '06',
-								'July' => '07',
-								'August' => '08',
-								'September' => '09',
-								'October' => '10',
-								'November' => '11',
-								'December' => '12'
-							);
+	private $months = array(
+		'January' => '01',
+		'February' => '02',
+		'March' => '03',
+		'April' => '04',
+		'May' => '05',
+		'June' => '06',
+		'July' => '07',
+		'August' => '08',
+		'September' => '09',
+		'October' => '10',
+		'November' => '11',
+		'December' => '12'
+	);
 	
 	/**
 	 * 
@@ -104,74 +93,80 @@ class feed {
 	 * 
 	 */
 	private $single = array(
-							'New Member',
-							'Member Left',
-							'Profile Change'
-						);
+		'New Member',
+		'Member Left',
+		'Profile Change'
+	);
+	
 	private $double = array(
-							'New Officer',
-							'Officer Demoted',
-							'Member Dropped',
-							'Invite Sent',
-							'New Event',
-							'Event Updated',
-							'Event Deleted'
-						);
+		'New Officer',
+		'Officer Demoted',
+		'Member Dropped',
+		'Invite Sent',
+		'New Event',
+		'Event Updated',
+		'Event Deleted'
+	);
+	
 	private $events = array(
-							'New Event',
-							'Event Updated',
-							'Event Deleted'
-						);
-	private $titles = array('', # 00
-								'New Member',           # 01 // Source Only
-								'Member Left',          # 02 // Source only
-								'New Officer',          # 03 // Target left, Source right
-								'Officer Demoted',      # 04 // Target left, Source right
-								'Member Dropped',       # 05 // Target left, Source right
-								'',                     # 06
-								'Invite Sent',          # 07 // Target left, Source right
-								'New Event',            # 08 // No URL Target left, Source right
-								'Event Updated',        # 09 // No URL Target left, Source right
-								'Event Deleted',        # 10 // No URL Target left, Source right
-								'Permissions Change',   # 11 // Source only
-								'New Announcement',     # 12 // Source only
-								'Announcement Updated', # 13 // Source only
-								'Announcement Deleted', # 14 // Source only
-								'',                     # 15
-								'Profile Change',       # 16 // web links     // Source only
-								'Profile Change',       # 17 // group details // Source only
-								'',                     # 18
-								'Group Locked',         # 19 // No Source, no Target
-								'',                     # 20
-								'',                     # 21
-								'Type Changed',         # 22 // public  // Source only
-								'Type Changed'          # 23 // private // Source only
-							);
-	private $description = array('',
-									' joined group',
-									' left group',
-									' was promoted to officer by ',
-									' was demoted to member by ',
-									' was kicked from the group by ',
-									'',
-									' was sent an invitation by ',
-									' event was created by ',
-									' event was updated by ',
-									' event was deleted by ',
-									'group permissions were changed by ',
-									'announcement was created by ',
-									'announcement was updated by ',
-									'announcement was deleted by ',
-									'',
-									' changed group web links',
-									' changed group details',
-									'',
-									'Modifications to the group have been disabled by Support',
-									'',
-									'',
-									'Group was changed into a public group by ',
-									'Group was changed into an invite-only group by '
-								);
+		'New Event',
+		'Event Updated',
+		'Event Deleted'
+	);
+	
+	private $titles = array(
+		'', # 00
+		'New Member',           # 01 // Source Only
+		'Member Left',          # 02 // Source only
+		'New Officer',          # 03 // Target left, Source right
+		'Officer Demoted',      # 04 // Target left, Source right
+		'Member Dropped',       # 05 // Target left, Source right
+		'',                     # 06
+		'Invite Sent',          # 07 // Target left, Source right
+		'New Event',            # 08 // No URL Target left, Source right
+		'Event Updated',        # 09 // No URL Target left, Source right
+		'Event Deleted',        # 10 // No URL Target left, Source right
+		'Permissions Change',   # 11 // Source only
+		'New Announcement',     # 12 // Source only
+		'Announcement Updated', # 13 // Source only
+		'Announcement Deleted', # 14 // Source only
+		'',                     # 15
+		'Profile Change',       # 16 // web links     // Source only
+		'Profile Change',       # 17 // group details // Source only
+		'',                     # 18
+		'Group Locked',         # 19 // No Source, no Target
+		'',                     # 20
+		'',                     # 21
+		'Type Changed',         # 22 // public  // Source only
+		'Type Changed'          # 23 // private // Source only
+	);
+	
+	private $description = array(
+		'',
+		' joined group',
+		' left group',
+		' was promoted to officer by ',
+		' was demoted to member by ',
+		' was kicked from the group by ',
+		'',
+		' was sent an invitation by ',
+		' event was created by ',
+		' event was updated by ',
+		' event was deleted by ',
+		'group permissions were changed by ',
+		'announcement was created by ',
+		'announcement was updated by ',
+		'announcement was deleted by ',
+		'',
+		' changed group web links',
+		' changed group details',
+		'',
+		'Modifications to the group have been disabled by Support',
+		'',
+		'',
+		'Group was changed into a public group by ',
+		'Group was changed into an invite-only group by '
+	);
 	
 	/**
 	 * __construct
@@ -181,83 +176,113 @@ class feed {
 	 * @param $group The group's short URL.
 	 * @param $table The table to store and call data from.
 	 */
-	public function __construct($group,$table) {
+	public function Feed($group,$table) {
+		$this->sb = new SteamBase();
+		$this->useragent = self::prefix . "Spider for Steam group history RSS feed";
+		
 		if ($group != null && $table != null) {
 			/**
 			 * Set MySQL Variables
 			 */
-			$this->connection = mysql_connect($this->host,$this->username,$this->password)
-				or die("Could not connect to database server!");
+			$this->connection = new mysqli($this->sb->host,$this->sb->username,$this->sb->password)
+				or exit(self::prefix . "Cound not establish a connection to the database. " . 
+					"Please check your settings." . self::br);
 			$this->group = $group;
 			$this->table = $table;
-			$this->database();
+			$this->CheckDatabase();
+			
+			$rsakey = $this->getRSAKey();
+			
+			#echo base64_decode($rsakey->publickey_mod);
+			
+			$rsa = new RSA_Handler();
+			$cpassword = $rsa->encrypt($this->sb->steampass, $rsakey->publickey_mod);
 			
 			/**
 			 * Set cURL Variables and Initialize Cookies
 			 */
+			$this->curlid = curl_init();
 			$this->options = array(
-				CURLOPT_URL            => "https://steamcommunity.com/",
-				//CURLOPT_COOKIEFILE     => "/tmp/cookie.txt",
+				CURLOPT_URL            => "https://steamcommunity.com/login/dologin/",
 				CURLOPT_COOKIEJAR      => "/tmp/cookies.txt",
-				# Setting CURLOPT_RETURNTRANSFER variable to 1 will force cURL
-				# not to print out the results of its query.
-				# Instead, it will return the results as a string return value
-				# from curl_exec() instead of the usual true/false.
 				CURLOPT_RETURNTRANSFER => 1,      // return web page
 				CURLOPT_HEADER         => false, // Do not return headers
 				CURLOPT_FOLLOWLOCATION => true,  // follow redirects
 				CURLOPT_POST           => 1,
-				CURLOPT_POSTFIELDS     => "action=doLogin&goto=&qs=&msg=&steamAccountName=" . 
-				$this->steamuser . "&steamPassword=" . $this->steampass,
-				//CURLOPT_ENCODING       => "",       // handle compressed
-				# SSL Variables
+				CURLOPT_POSTFIELDS     => "password=" . $cpassword . 
+										  "&username=" . $this->sb->steamuser . 
+										  "&captchagid=-1" . 
+										  "&rsatimestamp=" . $rsakey->timestamp,
 				CURLOPT_SSL_VERIFYPEER => true,
 				CURLOPT_SSL_VERIFYHOST => 2,
-				//CURLOPT_CAINFO         => "/tmp/steamcommunity.crt",
-				CURLOPT_USERAGENT      => 'libsteam', // who am i
-				CURLOPT_AUTOREFERER    => true,     // set referer on redirect
-				CURLOPT_CONNECTTIMEOUT => 120,      // timeout on connect
-				CURLOPT_TIMEOUT        => 120,      // timeout on response
-				CURLOPT_MAXREDIRS      => 10,       // stop after 10 redirects
+				CURLOPT_USERAGENT      => $this->useragent,
+				CURLOPT_AUTOREFERER    => true
 			);
-			$this->curlid = curl_init();
 			curl_setopt_array($this->curlid,$this->options);
 			// Execute Opt Array to create cookies
-			curl_exec($this->curlid);
-			//$login   = curl_exec($this->curlid);
-			//$logerr  = curl_errno($id);
-			//$logmsg  = curl_error($id);
-			//$loghead = curl_getinfo($id);
-			
-			//$loghead['errno']   = $logerr;
-			//$loghead['errmsg']  = $logmsg;
-			//$loghead['content'] = $login;
+			echo curl_exec($this->curlid);
+			$loghead = curl_getinfo($this->curlid);
+			$loghead['errno']   = curl_errno($this->curlid);
+			$loghead['errmsg']  = curl_error($this->curlid);
+			#$loghead['content'] = $login;
+			#print_r($loghead);
 		}
 	}
 	
-	public function __destruct() {
-		/*curl_close($this->curlid);
-		mysql_close($this->connection);
-		unset($this->curlid);
-		unset($this->options);
-		unset($this->table);
-		unset($this->group);*/
+	private function getRSAKey() {
+		$curlid = curl_init();
+		$options = array(
+			CURLOPT_URL            => "https://steamcommunity.com/login/getrsakey/",
+			CURLOPT_COOKIEJAR      => "/tmp/cookies.txt",
+			CURLOPT_RETURNTRANSFER => 1,
+			CURLOPT_HEADER         => false,
+			CURLOPT_FOLLOWLOCATION => false,
+			CURLOPT_POST           => 1,
+			CURLOPT_POSTFIELDS     => "username=" . $this->sb->steamuser,
+			CURLOPT_SSL_VERIFYPEER => true,
+			CURLOPT_SSL_VERIFYHOST => 2,
+			CURLOPT_USERAGENT      => $this->useragent,
+			CURLOPT_AUTOREFERER    => false
+		);
+		curl_setopt_array($curlid,$options);
+		$json = curl_exec($curlid);
+		return json_decode($json);
 	}
 	
-	/*public function __unset($this->curlid) {
-		curl_close($this->curlid);
+	public function __destruct() { }
+	
+	public function __toString() {
+		echo self::prefix . "Feed Exists!" . self::br;
 	}
 	
-	public function __unset($this->connection) {
-		mysql_close($this->connection);
-	}*/
+	public function CheckDatabase() {
+		if ($this->connection->select_db($this->sb->database)) {
+			// To-do: Remove title.
+			$this->connection->query(
+				"CREATE TABLE IF NOT EXISTS `" . $this->sb->database . "`.`$this->table` (
+					`id`          MEDIUMINT     NOT NULL ,
+					`type`        TINYINT       NOT NULL ,
+					`title`       VARCHAR( 32 ) NOT NULL ,
+					`date`        DATETIME      NOT NULL ,
+					`source`      VARCHAR( 32 ) NOT NULL ,
+					`sourceID`    BIGINT        NOT NULL ,
+					`target`      TINYTEXT      NULL ,
+					`targetID`    BIGINT        NULL ,
+					PRIMARY KEY ( `id` )
+				) ENGINE = MYISAM
+				CHARACTER SET utf8 COLLATE utf8_unicode_ci
+				COMMENT = 'RSS History for the " . strtoupper($this->table) . ", Steam group /$this->group/.';")
+			or exit(self::prefix . "You cannot make the table to store your group's history." . self::br);
+		} else {
+			$this->connection->query(
+				"CREATE DATABASE IF NOT EXISTS `$this->sb->database` " . 
+					"DEFAULT CHARACTER SET utf8 COLLATE utf8_bin",$this->connection)
+			or exit(self::prefix . "You cannot make the database!" . self::br);
+		}
+	}
 	
-	/*public function __toString() {
-		echo "Feed Exists!<br />\n";
-	}*/
-	
-	public function main($limit) {
-		mysql_select_db($this->database,$this->connection)
+	public function PrintRSS($limit) {
+		mysql_select_db($database,$this->connection)
 			or die("Cannot select database!");
 		
 		echo "<?xml version=\"1.0\" ?>\n";
@@ -305,54 +330,30 @@ class feed {
 		echo "</rss>";
 	}
 	
-	public function database() {
-		if (mysql_select_db($this->database,$this->connection)) {
-			// To-do: Remove title.
-			mysql_query(
-				"CREATE TABLE IF NOT EXISTS `" . $this->database . "`.`$this->table` (
-					`id`          MEDIUMINT     NOT NULL ,
-					`type`        TINYINT       NOT NULL ,
-					`title`       VARCHAR( 32 ) NOT NULL ,
-					`date`        DATETIME      NOT NULL ,
-					`source`      VARCHAR( 32 ) NOT NULL ,
-					`sourceID`    BIGINT        NOT NULL ,
-					`target`      TINYTEXT      NULL ,
-					`targetID`    BIGINT        NULL ,
-					PRIMARY KEY ( `id` )
-				) ENGINE = MYISAM CHARACTER SET utf8 COLLATE utf8_unicode_ci COMMENT = 'RSS History for the " . strtoupper($this->table) . ", Steam group /$this->group/.';",$this->connection)
-			or print("You cannot make the table!<br />\n");
-		} else {
-			mysql_query(
-				"CREATE DATABASE IF NOT EXISTS `$this->database` " . 
-					"DEFAULT CHARACTER SET utf8 COLLATE utf8_bin",$this->connection)
-			or print("You cannot make the database!<br />\n");
-		}
-	}
-	
 	/**
 	 * input_current
 	 * Function to input current history items.
 	 * 
 	 * 
 	 */
-	public function input_current() {
+	public function InputCurrent() {
 		$start_time = time();
-		echo "Started timer.<br />\n";
+		echo "Started timer." . self::br;
 		
-		$pages = $this->get_last_page();
+		$pages = $this->GetLastPage();
 		if ($pages == 0) {
 			echo "Could not fetch the number of pages: $pages";
 			curl_close($this->curlid);
-			mysql_close($this->connection);
+			$this->connection->close();
 			$this->__destruct();
 			return;
 		}
 		
-		$id = $this->get_item_count();
+		$id = $this->GetItemCount();
 		if ($id == 0) {
 			echo "Could not fetch the number of history items: $id";
 			curl_close($this->curlid);
-			mysql_close($this->connection);
+			$this->connection->close();
 			$this->__destruct();
 			return;
 		}
@@ -367,14 +368,14 @@ class feed {
 		
 		if ($num_rows == 0) {
 			$page = 1;
-			$history_item = new history_item();
+			$history_item = new HistoryItem();
 			while ($page <= $pages) {
-				echo "Parsing page $page.<br />\n";
-				$this->parse_page($page,&$id,$history_item);
+				echo "Parsing page $page." . self::br;
+				$this->ParsePage($page,$id,$history_item);
 				$page++;
 			}
 		} else {
-			echo "Table not empty, cannot input data.<br />\n";
+			echo "Table not empty, cannot input data." . self::br;
 		}
 		$end_time = time();
 		date_default_timezone_set("America/Chicago");
@@ -391,11 +392,11 @@ class feed {
 	 * 
 	 * 
 	 */
-	public function update() {
+	public function Update() {
 	
 	}
 	
-	private function parse_page($page,$id,$history_item) {
+	private function ParsePage($page,&$id,&$history_item) { // http://www.php.net/manual/en/language.references.pass.php
 		curl_setopt($this->curlid, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group . "/history?p=" . $page);
 		$content = curl_exec($this->curlid);
 		//echo $content;
@@ -425,7 +426,7 @@ class feed {
 					// increase stack and add the item
 					if (/*$segment >= 0 && */$segment !== false) {
 						$stack++;
-						//echo $item . "<br />";
+						//echo $item . self::br;
 						$output .= "<" . $item;
 					}
 				}
@@ -471,23 +472,23 @@ class feed {
 			$section = strip_tags($section,'<a>');
 			$section = explode("\r\n",$section);
 			$history_item->title = addslashes(trim($section[0]));
-			$history_item->date = addslashes($this->convert_steam_date(trim($section[2])));
+			$history_item->date = addslashes($this->ConvertSteamDate(trim($section[2])));
 			$desc = trim($section[4]);
-			//echo $desc . "<br />\n";
+			//echo $desc . self::br;
 			
 			// Get the source, source url, target, and target url
 			if (in_array($history_item->title,$this->double)) {
-				$first = $this->set_name_and_url(&$history_item,$desc,"target",0);
-				$this->set_name_and_url(&$history_item,$desc,"source",$first);
-				//echo $second[2] . "<br />\n";
+				$first = $this->SetNameAndURL($history_item,$desc,"target",0);
+				$this->SetNameAndURL($history_item,$desc,"source",$first);
+				//echo $second[2] . self::br;
 				//$history_item->desc = addslashes($second[2]);
 			} else {
-				$first = $this->set_name_and_url(&$history_item,$desc,"source",strpos($desc,"<a"));
-				//echo $first[2] . "<br />\n";
+				$first = $this->SetNameAndURL($history_item,$desc,"source",strpos($desc,"<a"));
+				//echo $first[2] . self::br;
 				//$history_item->desc = addslashes($first[2]);
 			}
 			
-			mysql_query(
+			/*mysql_query(
 				"INSERT INTO `" . $this->database . "`.`$this->table` (
 					`id`,
 					`type`,
@@ -499,9 +500,10 @@ class feed {
 					`targetID`
 				) VALUES $history_item;",$this->connection)
 				or print("<b>Could not insert row</b>: $history_item because:<br />&nbsp;&nbsp;&nbsp;&nbsp;" . mysql_error() . "<br />\n");
+			 */
 			
 			echo $history_item;
-			echo "\n<br />\n";
+			echo "\n" . self::br;
 		}
 	}
 	
@@ -514,7 +516,7 @@ class feed {
 	 * @param name         Source or Target for saving into history_item
 	 * @param offset          
 	 */
-	private function set_name_and_url($history_item,$desc,$name,$offset) {
+	private function SetNameAndURL(&$history_item,$desc,$name,$offset) {
 		$name_url = $name . "_url";
 		if (in_array($history_item->title,$this->events) && $offset == 0) {
 			$quote = strpos($desc,"\""); // Find the first quotation mark around the event
@@ -553,7 +555,7 @@ class feed {
 	 * 
 	 * @return $pages Number of pages for group history
 	 */
-	private function get_last_page() {
+	private function GetLastPage() {
 		curl_setopt($this->curlid, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
 		$content = curl_exec($this->curlid);
 		$pages = 0;
@@ -613,7 +615,7 @@ class feed {
 	 * 
 	 * @return The number of history items reported by the page.
 	 */
-	private function get_item_count() {
+	private function GetItemCount() {
 		curl_setopt($this->curlid, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
 		$content = curl_exec($this->curlid);
 		$location = strpos($content,'History Items');
@@ -640,7 +642,7 @@ class feed {
 	 * @param $date The date in Steam's format, trimmed
 	 * @return The date in ISO 8601 format
 	 */
-	private function convert_steam_date($steamdate) {
+	private function ConvertSteamDate($steamdate) {
 		//echo $steamdate . "<br />\n";
 		// Start with year
 		$date = $this->year . "-";
@@ -704,60 +706,22 @@ class feed {
 		//echo $date . "<br />\n";
 		return $date;
 	}
-	
-	public function check_cookies() {
-		$cookie = array();
-		$set = false;
-		for ($i = 0;$i < func_num_args();$i++) {
-			$cookie = func_get_arg($i);
-			if (!isset($cookie[0]) || $cookie[0] == null)
-				$cookie[0] = null;
-			if (!isset($cookie[1]) || $cookie[1] == null)
-				$cookie[1] = 0;
-			if (!isset($cookie[2]) || $cookie[2] == null)
-				$cookie[2] = time()+86400;
-			if (!isset($cookie[3]) || $cookie[3] == null)
-				$cookie[3] = '/';
-			if (!isset($cookie[4]) || $cookie[4] == null)
-				$cookie[4] = $_SERVER['SERVER_NAME'];
-			if (!isset($cookie[5]) || $cookie[5] == null)
-				$cookie[5] = false;
-			if (!isset($cookie[6]) || $cookie[6] == null)
-				$cookie[6] = true;
-			if (!isset($_COOKIE[$cookie[0]])) {
-				setcookie($cookie[0],$cookie[1],$cookie[2],$cookie[3],$cookie[4],$cookie[5],$cookie[6]);
-				$set = true;
-			}
-		}
-		if ($set) {
-			header("Location: http://" . $_SERVER['SERVER_NAME'] . $_SERVER['REQUEST_URI']);
-			exit();
-		}
-	}
-	
-	public function check_password($username,$password) {
-		$exists = false;
-		foreach ($this->users as $user => $pass)
-			if ($username == $user)
-				$exists = true;
-		if ($exists) {
-			if (md5($this->users[$username]) == $password) {
-				$this->authenticated = true;
-				return "GRANTED_ACCESS";
-			} else {
-				$this->authenticated = false;
-				return "INCORRECT_PASSWORD";
-			}
-		} else {
-			$this->authenticated = false;
-			return "INCORRECT_USERNAME";
-		}
-	}
 }
 
 if (isset($_GET['id'])) {
-	$feed = new feed("unigamia","uga");
-	$feed->input_current();
+	$feed = new Feed("unigamia","uga");
+	$feed->InputCurrent();
 }
 
+/**
+ * CHANGELOG
+ * 2011-08-14 01:06 - Fixed pass-by-reference errors and conversion from mysql to mysqli.
+ * 2012-06-19 12:00
+ * - Moved usernames and passwords to steambase.php for security.
+ * - Found two necessary URLs to access the Steam Community:
+ *   https://steamcommunity.com/public/javascript/login.js?v=384391121&amp;l=english :
+ *   https://steamcommunity.com/login/getrsakey/
+ *   https://steamcommunity.com/login/dologin/
+ * - Attempted to log into the Steam community with just the modulus.
+ */
 ?>
