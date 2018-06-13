@@ -712,16 +712,4 @@ if (isset($_GET['id'])) {
 	$feed = new Feed("unigamia","uga");
 	$feed->InputCurrent();
 }
-
-/**
- * CHANGELOG
- * 2011-08-14 01:06 - Fixed pass-by-reference errors and conversion from mysql to mysqli.
- * 2012-06-19 12:00
- * - Moved usernames and passwords to steambase.php for security.
- * - Found two necessary URLs to access the Steam Community:
- *   https://steamcommunity.com/public/javascript/login.js?v=384391121&amp;l=english :
- *   https://steamcommunity.com/login/getrsakey/
- *   https://steamcommunity.com/login/dologin/
- * - Attempted to log into the Steam community with just the modulus.
- */
 ?>
