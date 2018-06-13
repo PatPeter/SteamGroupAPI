@@ -165,7 +165,8 @@ class Feed {
 			}
 			
 			$rsa = new RSAHandler();
-			$cpassword = $rsa->encrypt(SteamBase::STEAM_PASSWORD, $rsaKey->publickey_mod);
+			$key = base64_encode(serialize(array($rsaKey->publickey_mod, 0, 4096)));
+			$cpassword = $rsa->encrypt(SteamBase::STEAM_PASSWORD, $key);
 			
 			/**
 			 * Set cURL Variables and Initialize Cookies
