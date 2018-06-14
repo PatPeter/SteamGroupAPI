@@ -11,7 +11,6 @@ class Core {
 			CURLOPT_RETURNTRANSFER => 1,      // return web page
 			CURLOPT_HEADER         => false, // Do not return headers
 			CURLOPT_FOLLOWLOCATION => true,  // follow redirects
-			CURLOPT_USERAGENT      => 'libsteam', // who am i
 			CURLOPT_AUTOREFERER    => true,     // set referer on redirect
 			CURLOPT_CONNECTTIMEOUT => 120,      // timeout on connect
 			CURLOPT_TIMEOUT        => 120,      // timeout on response

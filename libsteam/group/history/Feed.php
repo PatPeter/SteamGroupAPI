@@ -3,7 +3,9 @@ namespace libsteam\group\history;
 
 use libsteam\common\Core;
 use libsteam\common\SteamBase;
-use libsteam\common\RSAHandler;
+//use libsteam\common\RSAHandler;
+
+require('Crypt/RSA.php');
 
 class Feed {
 	const OFFSET = 2; // Offset for the time zone cURL fetches
@@ -164,36 +166,71 @@ class Feed {
 				exit(self::PREFIX . 'RSA not retrieved. Cannot continue.');
 			}
 			
-			$rsa = new RSAHandler();
-			$key = base64_encode(serialize(array($rsaKey->publickey_mod, 0, 4096)));
-			$cpassword = $rsa->encrypt(SteamBase::STEAM_PASSWORD, $key);
-			
-			/**
-			 * Set cURL Variables and Initialize Cookies
-			 */
-			$this->curlID = curl_init();
-			$this->options = array(
-				CURLOPT_URL            => 'https://steamcommunity.com/login/dologin/',
-				//CURLOPT_COOKIEJAR      => 'C:\Windows\Temp',
-				CURLOPT_RETURNTRANSFER => 1,      // return web page
-				CURLOPT_HEADER         => false, // Do not return headers
-				CURLOPT_FOLLOWLOCATION => true,  // follow redirects
-				CURLOPT_POST           => 1,
-				CURLOPT_POSTFIELDS     => "password=" . $cpassword . 
-										  "&username=" . SteamBase::STEAM_USERNAME . 
-										  "&captchagid=-1" . 
-										  "&rsatimestamp=" . $rsaKey->timestamp,
-				CURLOPT_SSL_VERIFYPEER => true,
-				CURLOPT_SSL_VERIFYHOST => 2,
-				CURLOPT_USERAGENT      => self::USER_AGENT,
-				CURLOPT_AUTOREFERER    => true
+			$rsa = new \Crypt_RSA();
+			$biExponent = new \Math_BigInteger($rsaKey->publickey_exp, 16);
+			$biModulus = new \Math_BigInteger($rsaKey->publickey_mod, 16);
+			echo $rsaKey->publickey_mod;
+			echo "<br />\n";
+			$rsa->loadKey(
+				array(
+					'e' => $biExponent,
+					'n' => $biModulus
+				)
 			);
-			curl_setopt_array($this->curlID,$this->options);
-			// Execute Opt Array to create cookies
-			echo curl_exec($this->curlID);
-			$loghead = curl_getinfo($this->curlID);
-			$loghead['errno']   = curl_errno($this->curlID);
-			$loghead['errmsg']  = curl_error($this->curlID);
+			//$rsa->setEncryptionMode(CRYPT_RSA_ENCRYPTION_PKCS1);
+			$cipher = $rsa->encrypt(SteamBase::STEAM_PASSWORD, CRYPT_RSA_PRIVATE_FORMAT_PKCS1);
+			echo "<br />\n";
+			echo "Cipher: ";
+			echo base64_encode($cipher);
+			echo "<br />\n";
+			
+			//$rsa = new RSAHandler();
+			//$key = base64_encode(serialize(array($rsaKey->publickey_mod, 0, 4096)));
+			//$cpassword = $rsa->encrypt(SteamBase::STEAM_PASSWORD, $key);
+			
+			if ($cipher !== false) {
+				/**
+				 * Set cURL Variables and Initialize Cookies
+				 */
+				/*$this->curlID = curl_init();
+				$this->options = array(
+					CURLOPT_URL            => 'https://steamcommunity.com/login/dologin/',
+					//CURLOPT_COOKIEJAR      => 'C:\Windows\Temp',
+					CURLOPT_RETURNTRANSFER => 1,      // return web page
+					CURLOPT_HEADER         => false, // Do not return headers
+					CURLOPT_FOLLOWLOCATION => true,  // follow redirects
+					CURLOPT_POST           => 1,
+					CURLOPT_POSTFIELDS     =>
+						"password=" . $cipher . 
+						"&username=" . SteamBase::STEAM_USERNAME . 
+						"&rsatimestamp=" . $rsaKey->timestamp . 
+						"&remember_login=true" . 
+						"&captchagid=1353635612925559166" .
+						"&captcha_text=PK8K9B"
+					,
+					CURLOPT_SSL_VERIFYPEER => true,
+					CURLOPT_SSL_VERIFYHOST => 2,
+					CURLOPT_USERAGENT      => self::USER_AGENT,
+					CURLOPT_AUTOREFERER    => true
+				);
+				curl_setopt_array($this->curlID,$this->options);
+				// Execute Opt Array to create cookies
+				$result = curl_exec($this->curlID);
+				echo $result;
+				echo "<br />";
+				$json = json_decode($result);
+				echo "<br />";
+				if (isset($json->captcha_gid)) {
+					echo '<a href="http://steamcommunity.com/public/captcha.php?gid=' . $json->captcha_gid . '">' . 
+						$json->captcha_gid . '</a>';
+					echo "<br />";
+				}
+				$loghead = curl_getinfo($this->curlID);
+				$loghead['errno']   = curl_errno($this->curlID);
+				$loghead['errmsg']  = curl_error($this->curlID);
+				var_dump($loghead);
+				echo "<br />";*/
+			}
 			#$loghead['content'] = $login;
 			#print_r($loghead);
 		}
