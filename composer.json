@@ -1,0 +1,16 @@
+{
+    "name": "patpeter/libsteam",
+    "description": "libsteam Libraries",
+    "type": "library",
+    "license": "All Rights Reserved",
+    "authors": [
+        {
+            "name": "Nicholas Solin",
+            "email": "solin.nick@gmail.com"
+        }
+    ],
+    "minimum-stability": "beta",
+    "require": {
+        "fabpot/goutte": "^3.2"
+    }
+}
