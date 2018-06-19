@@ -1,6 +1,6 @@
 {
-    "name": "patpeter/libsteam",
-    "description": "libsteam Libraries",
+    "name": "patpeter/steamgroupapi",
+    "description": "Steam has no OAuth API calls for Steam Groups (announcements, events, history), so I made my own.",
     "type": "library",
     "license": "All Rights Reserved",
     "authors": [
@@ -11,6 +11,7 @@
     ],
     "minimum-stability": "beta",
     "require": {
-        "fabpot/goutte": "^3.2"
+        "php-curl-class/php-curl-class": "^8.1",
+        "phpseclib/phpseclib": "2.0.11"
     }
 }
