@@ -1,17 +1,13 @@
 <?php
-namespace libsteam\group\history;
+namespace SteamGroupAPI\History;
 
-use libsteam\common\Core;
-use libsteam\common\SteamBase;
-//use libsteam\common\RSAHandler;
-
-require('Crypt/RSA.php');
+use SteamGroupAPI\Common\Core;
+use SteamGroupAPI\Common\SteamBase;
 
 class Feed {
 	const OFFSET = 2; // Offset for the time zone cURL fetches
 	const BR = "<br />\n";
-	const PREFIX = "[libsteam] ";
-	const USER_AGENT = 'libsteam';
+	const PREFIX = "[SteamGroupAPI] ";
 	
 	private $authcode  = ""; // For "enter your code here"
 	
@@ -79,34 +75,34 @@ class Feed {
 	private $events = array(
 		'New Event',
 		'Event Updated',
-		'Event Deleted'
+		'Event Deleted',
 	);
 	
 	private $titles = array(
-		'', # 00
-		'New Member',           # 01 // Source Only
-		'Member Left',          # 02 // Source only
-		'New Officer',          # 03 // Target left, Source right
-		'Officer Demoted',      # 04 // Target left, Source right
-		'Member Dropped',       # 05 // Target left, Source right
-		'',                     # 06
-		'Invite Sent',          # 07 // Target left, Source right
-		'New Event',            # 08 // No URL Target left, Source right
-		'Event Updated',        # 09 // No URL Target left, Source right
-		'Event Deleted',        # 10 // No URL Target left, Source right
-		'Permissions Change',   # 11 // Source only
-		'New Announcement',     # 12 // Source only
-		'Announcement Updated', # 13 // Source only
-		'Announcement Deleted', # 14 // Source only
-		'',                     # 15
-		'Profile Change',       # 16 // web links     // Source only
-		'Profile Change',       # 17 // group details // Source only
-		'',                     # 18
-		'Group Locked',         # 19 // No Source, no Target
-		'',                     # 20
-		'',                     # 21
-		'Type Changed',         # 22 // public  // Source only
-		'Type Changed'          # 23 // private // Source only
+		'',						# 00
+		'New Member',			# 01 // Source Only
+		'Member Left',			# 02 // Source only
+		'New Officer',			# 03 // Target left, Source right
+		'Officer Demoted',		# 04 // Target left, Source right
+		'Member Dropped',		# 05 // Target left, Source right
+		'',						# 06
+		'Invite Sent',			# 07 // Target left, Source right
+		'New Event',			# 08 // No URL Target left, Source right
+		'Event Updated',		# 09 // No URL Target left, Source right
+		'Event Deleted',		# 10 // No URL Target left, Source right
+		'Permissions Change',	# 11 // Source only
+		'New Announcement',		# 12 // Source only
+		'Announcement Updated',	# 13 // Source only
+		'Announcement Deleted',	# 14 // Source only
+		'',						# 15
+		'Profile Change',		# 16 // web links     // Source only
+		'Profile Change',		# 17 // group details // Source only
+		'',						# 18
+		'Group Locked',			# 19 // No Source, no Target
+		'',						# 20
+		'',						# 21
+		'Type Changed',			# 22 // public  // Source only
+		'Type Changed',			# 23 // private // Source only
 	);
 	
 	private $description = array(
@@ -147,10 +143,10 @@ class Feed {
 	public function __construct($group,$table) {
 		$this->useragent = self::PREFIX . "Spider for Steam group history RSS feed";
 		
-		if ($group != null && $table != null) {
+		/*if ($group != null && $table != null) {
 			/**
 			 * Set MySQL Variables
-			 */
+			 *
 			$this->connection = new \mysqli(SteamBase::HOST, SteamBase::USERNAME, SteamBase::PASSWORD)
 				or exit(self::PREFIX . "Cound not establish a connection to the database. " . 
 					"Please check your settings." . self::BR);
@@ -158,118 +154,13 @@ class Feed {
 			$this->table = $table;
 			$this->checkDatabase();
 			
-			
-			#echo base64_decode($rsakey->publickey_mod);
-			
-			$rsaKey = $this->getRSAKey();
-			if ($rsaKey == null) {
-				exit(self::PREFIX . 'RSA not retrieved. Cannot continue.');
-			}
-			
-			$rsa = new \Crypt_RSA();
-			$biExponent = new \Math_BigInteger($rsaKey->publickey_exp, 16);
-			$biModulus = new \Math_BigInteger($rsaKey->publickey_mod, 16);
-			echo $rsaKey->publickey_mod;
-			echo "<br />\n";
-			$rsa->loadKey(
-				array(
-					'e' => $biExponent,
-					'n' => $biModulus
-				)
-			);
-			//$rsa->setEncryptionMode(CRYPT_RSA_ENCRYPTION_PKCS1);
-			$cipher = $rsa->encrypt(SteamBase::STEAM_PASSWORD, CRYPT_RSA_PRIVATE_FORMAT_PKCS1);
-			echo "<br />\n";
-			echo "Cipher: ";
-			echo base64_encode($cipher);
-			echo "<br />\n";
-			
-			//$rsa = new RSAHandler();
-			//$key = base64_encode(serialize(array($rsaKey->publickey_mod, 0, 4096)));
-			//$cpassword = $rsa->encrypt(SteamBase::STEAM_PASSWORD, $key);
-			
-			if ($cipher !== false) {
-				/**
-				 * Set cURL Variables and Initialize Cookies
-				 */
-				/*$this->curlID = curl_init();
-				$this->options = array(
-					CURLOPT_URL            => 'https://steamcommunity.com/login/dologin/',
-					//CURLOPT_COOKIEJAR      => 'C:\Windows\Temp',
-					CURLOPT_RETURNTRANSFER => 1,      // return web page
-					CURLOPT_HEADER         => false, // Do not return headers
-					CURLOPT_FOLLOWLOCATION => true,  // follow redirects
-					CURLOPT_POST           => 1,
-					CURLOPT_POSTFIELDS     =>
-						"password=" . $cipher . 
-						"&username=" . SteamBase::STEAM_USERNAME . 
-						"&rsatimestamp=" . $rsaKey->timestamp . 
-						"&remember_login=true" . 
-						"&captchagid=1353635612925559166" .
-						"&captcha_text=PK8K9B"
-					,
-					CURLOPT_SSL_VERIFYPEER => true,
-					CURLOPT_SSL_VERIFYHOST => 2,
-					CURLOPT_USERAGENT      => self::USER_AGENT,
-					CURLOPT_AUTOREFERER    => true
-				);
-				curl_setopt_array($this->curlID,$this->options);
-				// Execute Opt Array to create cookies
-				$result = curl_exec($this->curlID);
-				echo $result;
-				echo "<br />";
-				$json = json_decode($result);
-				echo "<br />";
-				if (isset($json->captcha_gid)) {
-					echo '<a href="http://steamcommunity.com/public/captcha.php?gid=' . $json->captcha_gid . '">' . 
-						$json->captcha_gid . '</a>';
-					echo "<br />";
-				}
-				$loghead = curl_getinfo($this->curlID);
-				$loghead['errno']   = curl_errno($this->curlID);
-				$loghead['errmsg']  = curl_error($this->curlID);
-				var_dump($loghead);
-				echo "<br />";*/
-			}
-			#$loghead['content'] = $login;
-			#print_r($loghead);
-		}
+		}*/
 	}
 	
 	public function __destruct() { }
 	
 	public function __toString() {
 		echo self::PREFIX . "Feed Exists!" . self::BR;
-	}
-	
-	private function getRSAKey() {
-		$curlID = curl_init();
-		$options = array(
-			CURLOPT_URL            => 'https://steamcommunity.com/login/getrsakey/',
-			//CURLOPT_COOKIEJAR      => '%TMP%',
-			CURLOPT_RETURNTRANSFER => 1,
-			CURLOPT_HEADER         => false,
-			CURLOPT_FOLLOWLOCATION => false,
-			CURLOPT_POST           => 1,
-			CURLOPT_POSTFIELDS     => "username=" . SteamBase::STEAM_USERNAME,
-			CURLOPT_SSL_VERIFYPEER => true,
-			CURLOPT_SSL_VERIFYHOST => 2,
-			CURLOPT_USERAGENT      => self::USER_AGENT,
-			CURLOPT_AUTOREFERER    => false
-		);
-		curl_setopt_array($curlID,$options);
-		$json = curl_exec($curlID);
-		$loghead = curl_getinfo($curlID);
-		print_r($json);
-		print_r($loghead);
-		if (curl_errno($curlID) != 0) {
-			die(self::PREFIX . curl_error($curlID));
-		}
-		return json_decode($json);
-	}
-	
-	public function doLogin() {
-		
 	}
 	
 	public function checkDatabase() {
@@ -413,9 +304,9 @@ class Feed {
 	
 	}
 	
-	private function ParsePage($page,&$id,&$history_item) { // http://www.php.net/manual/en/language.references.pass.php
-		curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group . "/history?p=" . $page);
-		$content = curl_exec($this->curlID);
+	public function ParsePage($curl, $content/*$page*/,&$id,&$history_item) { // http://www.php.net/manual/en/language.references.pass.php
+		//curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group . "/history?p=" . $page);
+		//$content = curl_exec($this->curlID);
 		//echo $content;
 		
 		$items = explode('<',$content);
@@ -482,7 +373,7 @@ class Feed {
 			$img = explode("/",$img); # Explode the URL to obtain the image name
 			$img = $img[count($img) - 1]; # Get the image name
 			//echo $img;
-			$history_item->img = ereg_replace("[^0-9]","",$img); # Remove all characters not numbers from image
+			$history_item->img = preg_replace("[^0-9]","",$img); # Remove all characters not numbers from image
 			//echo $history_item->img;
 			
 			// Get the title and convert the date
@@ -495,12 +386,12 @@ class Feed {
 			
 			// Get the source, source url, target, and target url
 			if (in_array($history_item->title,$this->double)) {
-				$first = $this->SetNameAndURL($history_item,$desc,"target",0);
+				$first = $this->SetNameAndURL($curl, $history_item,$desc,"target",0);
 				$this->SetNameAndURL($history_item,$desc,"source",$first);
 				//echo $second[2] . self::BR;
 				//$history_item->desc = addslashes($second[2]);
 			} else {
-				$first = $this->SetNameAndURL($history_item,$desc,"source",strpos($desc,"<a"));
+				$first = $this->SetNameAndURL($curl, $history_item,$desc,"source",strpos($desc,"<a"));
 				//echo $first[2] . self::BR;
 				//$history_item->desc = addslashes($first[2]);
 			}
@@ -533,7 +424,7 @@ class Feed {
 	 * @param name         Source or Target for saving into history_item
 	 * @param offset          
 	 */
-	private function SetNameAndURL(&$history_item, $desc, $name, $offset) {
+	private function SetNameAndURL($curl, &$history_item, $desc, $name, $offset) {
 		$name_url = $name . "_url";
 		if (in_array($history_item->title,$this->events) && $offset == 0) {
 			$quote = strpos($desc,"\""); // Find the first quotation mark around the event
@@ -548,7 +439,7 @@ class Feed {
 			$item = substr($desc,$quote + 6,$endquote - ($quote + 6));
 			if (strpos($desc,"/id/") !== false) {
 				$converter = new Core();
-				$item = $converter->convertCommunityID($item);
+				$item = $converter->convertCommunityID($curl, $item);
 				unset($converter);
 			} else {
 				$item = explode("/",$item);
@@ -572,58 +463,13 @@ class Feed {
 	 * 
 	 * @return $pages Number of pages for group history
 	 */
-	private function GetLastPage() {
-		curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
-		$content = curl_exec($this->curlID);
-		$pages = 0;
-		$segment = strpos($content,'pageLinks');
-		if ($segment === false) {
-			return $pages;
-		} else {
-			// Get the segment containing the pages and trim
-			$end = strpos($content,'</div>',$segment);
-			$pagelinks = substr($content,$segment,$end - $segment);
-			unset($content);
-			$pagelinks = trim($pagelinks);
-			
-			// Remove characters and entities between links
-			// and inside unimportant links
-			//echo $pagelinks . "<br />\n";
-			$pagelinks = str_replace("...","",$pagelinks);
-			$pagelinks = str_replace("&nbsp;&nbsp;"," ",$pagelinks);
-			$pagelinks = str_replace("&gt;&gt;"," ",$pagelinks);
-			$pagelinks = str_replace("&nbsp;"," ",$pagelinks);
-			//echo $pagelinks . "<br />\n";
-			
-			// Remove characters before links
-			// To do: Find first <a> in segment and remove loop
-			/*$l = strlen($pagelinks);
-			for ($i = 0; $i < $l; $i++) {
-				$char = substr($pagelinks,$i, 1);
-				if ($char == "<") {
-					echo $pagelinks . "<br />\n";
-					$pagelinks = substr($pagelinks,$i,$l - $i);
-					echo $pagelinks . "<br />\n";
-					break;
-				}
-			}*/
-			
-			// Remove links and trim
-			$pagelinks = strip_tags($pagelinks);
-			$pagelinks = trim($pagelinks);
-			//echo $pagelinks . "<br />\n";
-			
-			// Change into array
-			$pagenumbers = explode(" ",$pagelinks);
-			
-			// Find largest page
-			// To Do: Use last item in array instead of loop?
-			//foreach ($pagenumbers as $pagenumber) 
-			//	if ($pagenumber > $pages)
-			//		$pages = $pagenumber;
-			$pages = $pagenumbers[count($pagenumbers) - 1];
-		}
-		return $pages;
+	private function GetLastPage(\DOMDocument $doc) {
+            $xpath = new DOMXPath($doc);
+            /* @var $elements \DOMNodeList */
+            $elements = $xpath->query("//*/a[@class='pagelink']");
+            /* @var $pagelink \DOMElement */
+            $pagelink = $elements[$elements->length - 1];
+            return $pagelink->textContent;
 	}
 	
 	/**
@@ -685,7 +531,7 @@ class Feed {
 		
 		# Remove letters from the day and store it
 		# Ensure that it has a leading zero
-		$day = ereg_replace("[^0-9]", "", $expdate[1]);
+		$day = preg_replace("[^0-9]", "", $expdate[1]);
 		if ((int) $day < 10)
 			$day = "0" . $day;
 		
@@ -697,10 +543,10 @@ class Feed {
 		# zero if necessary, and concatenate
 		$time = $expdate[3];
 		//$timelen = strlen($time);
-		$meridian = ereg_replace("[^a-z]","",$time);
+		$meridian = preg_replace("[^a-z]","",$time);
 		//$meridian = substr($time,$timelen - 2,$timelen);
 		//echo $meridian . "<br />";
-		$time = ereg_replace("[a-z]","",$time);
+		$time = preg_replace("[a-z]","",$time);
 		//echo $time . "<br />";
 		//$time = substr($time,0,$timelen - 2);
 		$time = explode(":",$time);

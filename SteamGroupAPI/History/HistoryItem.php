@@ -1,5 +1,5 @@
 <?php
-namespace libsteam\group\history;
+namespace SteamGroupAPI\History;
 
 class HistoryItem {
 	public $id;

@@ -1,7 +1,5 @@
 <?php
-set_include_path(get_include_path() . PATH_SEPARATOR . 
-	'C:\Program Files (x86)\Apache Software Foundation\Apache2.2\htdocs\libsteam' . PATH_SEPARATOR . 
-	'C:\Program Files (x86)\Apache Software Foundation\Apache2.2\htdocs\libsteam\phpseclib');
+set_include_path(get_include_path() . '.');
 
 spl_autoload_register(function($class) {
 	if (strstr($class, 'Crypt') !== false || strstr($class, 'File') !== false ||
