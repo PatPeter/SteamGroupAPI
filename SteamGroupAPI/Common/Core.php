@@ -1,5 +1,5 @@
 <?php
-namespace libsteam\common;
+namespace SteamGroupAPI\Common;
 
 class Core {
 	private $id;
@@ -43,5 +43,17 @@ class Core {
 		$newlink = substr($content,$id_position + 20,17);
 		unset($content);
 		return $newlink;
+	}
+
+	public function convertCommunityID($link) {
+            echo "LINK: " . $link;
+            curl_setopt($this->id, CURLOPT_URL, $link);
+            $content = curl_exec($this->id);
+            curl_close($this->id);
+
+            $id_position = strpos($content,"steam://friends/add/");
+            $newlink = "http://steamcommunity.com/profiles/" . substr($content,$id_position + 20,17);
+            unset($content);
+            return $newlink;
 	}
 }
