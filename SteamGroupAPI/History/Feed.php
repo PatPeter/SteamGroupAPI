@@ -78,7 +78,7 @@ class Feed {
 		'Event Deleted',
 	);
 	
-	private $titles = array(
+	public $titles = array(
 		'',						# 00
 		'New Member',			# 01 // Source Only
 		'Member Left',			# 02 // Source only
@@ -103,33 +103,49 @@ class Feed {
 		'',						# 21
 		'Type Changed',			# 22 // public  // Source only
 		'Type Changed',			# 23 // private // Source only
+		'',						# 24
+		'',						# 25
+		'',						# 26
+		'',						# 27
+		'New Moderator',		# 28 // Target left, source right
+		'',						# 29
+		'',						# 30
+		'New Join Request',		# 31 // Source only
 	);
 	
-	private $description = array(
-		'',
-		' joined group',
-		' left group',
-		' was promoted to officer by ',
-		' was demoted to member by ',
-		' was kicked from the group by ',
-		'',
-		' was sent an invitation by ',
-		' event was created by ',
-		' event was updated by ',
-		' event was deleted by ',
-		'group permissions were changed by ',
-		'announcement was created by ',
-		'announcement was updated by ',
-		'announcement was deleted by ',
-		'',
-		' changed group web links',
-		' changed group details',
-		'',
-		'Modifications to the group have been disabled by Support',
-		'',
-		'',
-		'Group was changed into a public group by ',
-		'Group was changed into an invite-only group by '
+	public $description = array(
+		'',																# 00
+		' joined group',												# 01
+		' left group',													# 02
+		' was promoted to officer by ',									# 03
+		' was demoted to member by ',									# 04
+		' was kicked from the group by ',								# 05
+		'',																# 06
+		' was sent an invitation by ',									# 07
+		' event was created by ',										# 08
+		' event was updated by ',										# 09
+		' event was deleted by ',										# 10
+		'group permissions were changed by ',							# 11
+		'announcement was created by ',									# 12
+		'announcement was updated by ',									# 13
+		'announcement was deleted by ',									# 14
+		'',																# 15
+		' changed group web links',										# 16
+		' changed group details',										# 17
+		'',																# 18
+		'Modifications to the group have been disabled by Support',		# 19
+		'',																# 20
+		'',																# 21
+		'Group was changed into a public group by ',					# 22
+		'Group was changed into an invite-only group by ',				# 23
+		'',																# 24
+		'',																# 25
+		'',																# 26
+		'',																# 27
+		' was promoted to moderator by ',								# 28
+		'',																# 29
+		'',																# 30
+		' requested to join',											# 31
 	);
 	
 	/**

@@ -1,1 +1,0 @@
-"C:\Program Files (x86)\Apache Software Foundation\Apache2.2\php\php.exe" composer.phar install

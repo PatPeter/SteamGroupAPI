@@ -2,10 +2,15 @@
 namespace SteamGroupAPI\History;
 
 class HistoryItem {
-	public $id;
-	public $img;
+	public $group_id;
+	public $history_id;
+	public $type_id;
 	public $title;
 	public $date;
+	public $year_offset;
+	public $month;
+	public $day;
+	public $time;
 	public $source = '';
 	public $source_url = '';
 	public $target = '';
