@@ -156,53 +156,15 @@ class Feed {
 	 * @param $group The group's short URL.
 	 * @param $table The table to store and call data from.
 	 */
-	public function __construct($group,$table) {
-		$this->useragent = self::PREFIX . "Spider for Steam group history RSS feed";
-		
-		/*if ($group != null && $table != null) {
-			/**
-			 * Set MySQL Variables
-			 *
-			$this->connection = new \mysqli(SteamBase::HOST, SteamBase::USERNAME, SteamBase::PASSWORD)
-				or exit(self::PREFIX . "Cound not establish a connection to the database. " . 
-					"Please check your settings." . self::BR);
-			$this->group = $group;
-			$this->table = $table;
-			$this->checkDatabase();
-			
-		}*/
+	public function __construct($group, $table, $year) {
+		$this->year = $year;
+		// TODO: Generate group_id with XML cURL get
 	}
 	
 	public function __destruct() { }
 	
 	public function __toString() {
 		echo self::PREFIX . "Feed Exists!" . self::BR;
-	}
-	
-	public function checkDatabase() {
-		if ($this->connection->select_db(SteamBase::DATABASE)) {
-			// To-do: Remove title.
-			$this->connection->query(
-				"CREATE TABLE IF NOT EXISTS `" . SteamBase::DATABASE . "`.`$this->table` (
-					`id`          MEDIUMINT     NOT NULL ,
-					`type`        TINYINT       NOT NULL ,
-					`title`       VARCHAR( 32 ) NOT NULL ,
-					`date`        DATETIME      NOT NULL ,
-					`source`      VARCHAR( 32 ) NOT NULL ,
-					`sourceID`    BIGINT        NOT NULL ,
-					`target`      TINYTEXT      NULL ,
-					`targetID`    BIGINT        NULL ,
-					PRIMARY KEY ( `id` )
-				) ENGINE = MYISAM
-				CHARACTER SET utf8 COLLATE utf8_unicode_ci
-				COMMENT = 'RSS History for the " . strtoupper($this->table) . ", Steam group /$this->group/.';")
-			or exit(self::PREFIX . "You cannot make the table to store your group's history." . self::BR);
-		} else {
-			$this->connection->query(
-				"CREATE DATABASE IF NOT EXISTS `" . SteamBase::DATABASE . "` " . 
-					"DEFAULT CHARACTER SET utf8 COLLATE utf8_bin")
-			or exit(self::PREFIX . "You cannot make the database!" . self::BR);
-		}
 	}
 	
 	public function PrintRSS($limit) {
@@ -320,115 +282,88 @@ class Feed {
 	
 	}
 	
-	public function ParsePage($curl, $content/*$page*/,&$id,&$history_item) { // http://www.php.net/manual/en/language.references.pass.php
-		//curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group . "/history?p=" . $page);
-		//$content = curl_exec($this->curlID);
-		//echo $content;
+	public function ParsePage(\DOMDocument $doc, $yearOffset, $lastMonth) { // http://www.php.net/manual/en/language.references.pass.php
+		$history_items = array();
+
+		$xpath = new \DOMXPath($doc);
+		/* @var $divs \DOMNode */
+		$divs = $xpath->query("//*/div[@class='historyItem' or @class='historyItemb']");
 		
-		$items = explode('<',$content);
-		unset($content);
-		
-		/**
-		 * 
-		 * 
-		 * 
-		 */
-		$stack = 0;
-		$output = "";
-		foreach ($items as $item) {
-			// Check for div tag
-			if (substr($item,0,3) == "div") {
-				// Increment stack if it finds a historyItem or
-				// a div within a historyItem
-				if ($stack > 0) {
-					// Only increment on non-historyItem div tags
-					// if they are not inside of historyItems
-					$stack++;
-				} else {
-					$segment = strpos($item,'historyItem');
-					// If historyItem is located in the string
-					// increase stack and add the item
-					if (/*$segment >= 0 && */$segment !== false) {
-						$stack++;
-						//echo $item . self::BR;
-						$output .= "<" . $item;
+		//$yearOffset = 0;
+		//$lastMonth = 0;
+		for ($i = $divs->length - 1; -1 < $i; $i--) {
+			/* @var $div \DOMElement */
+			$div = $divs->item($i);
+			$history_item = new HistoryItem();
+			$history_item->group_id = "103582791430024497";
+			$history_item->history_id = $i + 1;
+			$processedNodes = array();
+			/* @var $childNode \DOMElement */
+			foreach ($div->childNodes as $childNode) {
+				//error_log("CHILD NODE: " . $doc->saveHtml($childNode));
+				if ($childNode->attributes != null) {
+					//error_log("SWITCH ON CLASS: " . $childNode->attributes->getNamedItem("class")->textContent);
+
+					switch ($childNode->attributes->getNamedItem("class")->textContent) {
+						case "historyIcon":
+							$img = $childNode->childNodes->item(0);
+							$history_item->type_id = str_replace(array('https://steamcommunity-a.akamaihd.net/public/images/skin_1/HistoryAction', 'b.gif', '.gif',), array('', '', '',), $img->attributes->getNamedItem("src")->textContent);
+							$processedNodes[] = $childNode;
+							//$div->removeChild($childNode);
+							break;
+
+						case "historyShort":
+							$history_item->title = $childNode->textContent;
+							//$div->removeChild($childNode);
+							$processedNodes[] = $childNode;
+							break;
+
+						case "historyDate":
+							$dateParts = date_parse(str_replace(' @ ', ' ', $childNode->textContent));
+							if ($dateParts['month'] > $lastMonth) {
+								$lastMonth = $dateParts['month'];
+							} else if ($dateParts['month'] < $lastMonth) {
+								$yearOffset++;
+								$lastMonth = $dateParts['month'];
+							}
+							$history_item->year_offset = $yearOffset;
+							$history_item->month = $dateParts['month'];
+							$history_item->day = $dateParts['day'];
+							$history_item->time = $dateParts['hour'] . ':' . $dateParts['minute'] . ':' . $dateParts['second'];
+							$history_item->date = ($this->year + $yearOffset) . '-' . $history_item->month . '-' . $history_item->day . ' ' . $history_item->time;
+							//$div->removeChild($childNode);
+							$processedNodes[] = $childNode;
+							break;
+
+						case "historyDash";
+							$processedNodes[] = $childNode;
+							break;
+
+						case "whiteLink":
+							if ($history_item->source == '') {
+								$history_item->source = $childNode->textContent;
+								$history_item->source_url = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
+							} else {
+								$history_item->target = $history_item->source;
+								$history_item->target_url = $history_item->source_url;
+								$history_item->source = $childNode->textContent;
+								$history_item->source_url = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
+							}
+							$processedNodes[] = $childNode;
+							break;
 					}
 				}
-			// Check for div ending tag, decrement the stack and
-			// add the tag to the output
-			} elseif (substr($item,0,4) == "/div") {
-				if ($stack > 1) {
-					// If a div within a historyItem, decrement and discard
-					$stack--;
-				} elseif ($stack == 1) {
-					// If the div corresponds to the historyItem, decrement and close
-					$stack--;
-					$output .= "<" . $item;
-				}
-			// If the stack is positive keep adding to the output
-			} elseif ($stack > 0) {
-				$output .= "<" . $item;
 			}
-		}
-		//echo $output;
-		while ($end = strpos($output,'</div>')) {
-			$section = substr($output,0,$end + 6);
-			$output = substr($output,$end + 6,strlen($output));
-			$section = strip_tags($section,'<img><span><a>');
-			$section = trim($section);
-			
-			$history_item->unsetall();
-			// Set the id and decrement
-			$history_item->id = $id;
-			$id--;
-			
-			// Get the image link
-			$imgstart = strpos($section,"src=\"");
-			$imgend = strpos($section,".gif\"");
-			$img = substr($section,$imgstart + 5,($imgend + 4) - ($imgstart + 5));
-			$img = explode("/",$img); # Explode the URL to obtain the image name
-			$img = $img[count($img) - 1]; # Get the image name
-			//echo $img;
-			$history_item->img = preg_replace("[^0-9]","",$img); # Remove all characters not numbers from image
-			//echo $history_item->img;
-			
-			// Get the title and convert the date
-			$section = strip_tags($section,'<a>');
-			$section = explode("\r\n",$section);
-			$history_item->title = addslashes(trim($section[0]));
-			$history_item->date = addslashes($this->convertSteamDate(trim($section[2])));
-			$desc = trim($section[4]);
-			//echo $desc . self::BR;
-			
-			// Get the source, source url, target, and target url
-			if (in_array($history_item->title,$this->double)) {
-				$first = $this->SetNameAndURL($curl, $history_item,$desc,"target",0);
-				$this->SetNameAndURL($history_item,$desc,"source",$first);
-				//echo $second[2] . self::BR;
-				//$history_item->desc = addslashes($second[2]);
-			} else {
-				$first = $this->SetNameAndURL($curl, $history_item,$desc,"source",strpos($desc,"<a"));
-				//echo $first[2] . self::BR;
-				//$history_item->desc = addslashes($first[2]);
+			foreach ($processedNodes as $childNode) {
+				$div->removeChild($childNode);
 			}
-			
-			/*mysql_query(
-				"INSERT INTO `" . $this->database . "`.`$this->table` (
-					`id`,
-					`type`,
-					`title`,
-					`date`,
-					`source`,
-					`sourceID`,
-					`target`,
-					`targetID`
-				) VALUES $history_item;",$this->connection)
-				or print("<b>Could not insert row</b>: $history_item because:<br />&nbsp;&nbsp;&nbsp;&nbsp;" . mysql_error() . "<br />\n");
-			 */
-			
-			echo $history_item;
-			echo "\n" . self::BR;
+
+			//error_log("HISTORY DETAILS: " . trim($doc->saveHtml($div)));
+
+			$history_items[] = $history_item;
 		}
+		
+		return $history_items;
 	}
 	
 	/**
@@ -479,12 +414,12 @@ class Feed {
 	 * 
 	 * @return $pages Number of pages for group history
 	 */
-	private function GetLastPage(\DOMDocument $doc) {
-            $xpath = new DOMXPath($doc);
+	public function GetLastPage(\DOMDocument $doc) {
+            $xpath = new \DOMXPath($doc);
             /* @var $elements \DOMNodeList */
             $elements = $xpath->query("//*/a[@class='pagelink']");
             /* @var $pagelink \DOMElement */
-            $pagelink = $elements[$elements->length - 1];
+            $pagelink = $elements->item($elements->length - 1);
             return $pagelink->textContent;
 	}
 	
