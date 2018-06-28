@@ -170,7 +170,6 @@ class Feed {
 	public function PrintRSS($limit) {
 		mysql_select_db($database,$this->connection)
 			or die("Cannot select database!");
-		
 		echo "<?xml version=\"1.0\" ?>\n";
 		echo "<rss version=\"2.0\">\n";
 		echo "<channel>\n";
@@ -278,8 +277,8 @@ class Feed {
 	 * 
 	 * 
 	 */
-	public function Update() {
-	
+	public function Update(\DOMDocument $doc, $history_items) {
+		
 	}
 	
 	public function ParsePage(\DOMDocument $doc, $yearOffset, $lastMonth) { // http://www.php.net/manual/en/language.references.pass.php
@@ -319,18 +318,26 @@ class Feed {
 							break;
 
 						case "historyDate":
-							$dateParts = date_parse(str_replace(' @ ', ' ', $childNode->textContent));
-							if ($dateParts['month'] > $lastMonth) {
-								$lastMonth = $dateParts['month'];
-							} else if ($dateParts['month'] < $lastMonth) {
+							/* @var $dateParts \DateTime */
+							$dateParts = \DateTime::createFromFormat('F jS @ g:ia', $childNode->textContent);
+							if ($dateParts == false) {
+								throw new \Exception();
+							}
+							$month = $dateParts->format('m');
+							$day = $dateParts->format('d');
+							if ($month > $lastMonth) {
+								$lastMonth = $month;
+							} else if ($month < $lastMonth) {
 								$yearOffset++;
-								$lastMonth = $dateParts['month'];
+								$lastMonth = $month;
 							}
 							$history_item->year_offset = $yearOffset;
-							$history_item->month = $dateParts['month'];
-							$history_item->day = $dateParts['day'];
-							$history_item->time = $dateParts['hour'] . ':' . $dateParts['minute'] . ':' . $dateParts['second'];
-							$history_item->date = ($this->year + $yearOffset) . '-' . $history_item->month . '-' . $history_item->day . ' ' . $history_item->time;
+							$history_item->month = $month;
+							$history_item->day = $day;
+							$history_item->time = $dateParts->format("H:i:s");
+							
+							$dateParts->setDate($this->year + $yearOffset, $month, $day);
+							$history_item->date = $dateParts->format("Y-m-d H:i:s");
 							//$div->removeChild($childNode);
 							$processedNodes[] = $childNode;
 							break;
@@ -342,12 +349,12 @@ class Feed {
 						case "whiteLink":
 							if ($history_item->source == '') {
 								$history_item->source = $childNode->textContent;
-								$history_item->source_url = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
+								$history_item->source_steam_id = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
 							} else {
 								$history_item->target = $history_item->source;
-								$history_item->target_url = $history_item->source_url;
+								$history_item->target_steam_id = $history_item->source_steam_id;
 								$history_item->source = $childNode->textContent;
-								$history_item->source_url = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
+								$history_item->source_steam_id = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
 							}
 							$processedNodes[] = $childNode;
 							break;
@@ -357,7 +364,15 @@ class Feed {
 			foreach ($processedNodes as $childNode) {
 				$div->removeChild($childNode);
 			}
-
+			
+			// Event code
+			$startQuote = strpos($childNode->textContent, '"');
+			if (strpos($childNode->textContent, '"') !== false) {
+				$endQuote = strpos($childNode->textContent, '"', $startQuote + 1);
+				$eventName = substr($childNode->textContent, $startQuote + 1, $endQuote - ($startQuote + 1));
+				$history_item->target = $eventName;
+			}
+			
 			//error_log("HISTORY DETAILS: " . trim($doc->saveHtml($div)));
 
 			$history_items[] = $history_item;
@@ -367,60 +382,18 @@ class Feed {
 	}
 	
 	/**
-	 * set_name_and_url
-	 * 
-	 * 
-	 * @param history_item Passed reference from program's history_item
-	 * @param desc         Description section of row
-	 * @param name         Source or Target for saving into history_item
-	 * @param offset          
-	 */
-	private function SetNameAndURL($curl, &$history_item, $desc, $name, $offset) {
-		$name_url = $name . "_url";
-		if (in_array($history_item->title,$this->events) && $offset == 0) {
-			$quote = strpos($desc,"\""); // Find the first quotation mark around the event
-			$endquote = strpos($desc,"\"",$quote + 1); // Find the second quotation mark
-			$item = substr($desc,$quote + 1,$endquote - ($quote + 1)); // Get the event title
-			$newoffset = strpos($desc,"<a",$endquote + 1);
-			$history_item->$name_url = "NULL"; // Set the URL to NULL
-			$history_item->$name = addslashes($item); // Set the name to the event's name
-		} else {
-			$quote = strpos($desc,"href=\"",$offset);
-			$endquote = strpos($desc,"\"",$quote + 6);
-			$item = substr($desc,$quote + 6,$endquote - ($quote + 6));
-			if (strpos($desc,"/id/") !== false) {
-				$converter = new Core();
-				$item = $converter->convertCommunityID($curl, $item);
-				unset($converter);
-			} else {
-				$item = explode("/",$item);
-				$item = $item[count($item) - 1];
-			}
-			$history_item->$name_url = addslashes($item);
-			
-			$tagend = strpos($desc,"</a>",$offset);
-			$tag = substr($desc,$offset,($tagend + 4) - $offset);
-			$newoffset = strpos($desc,"<a",$tagend + 4);
-			//echo $tag . "<br />\n";
-			$history_item->$name = addslashes(strip_tags($tag));
-		}
-		//echo $item . "<br />\n";
-		return $newoffset;
-	}
-	
-	/**
 	 * get_last_page
 	 * 
 	 * 
 	 * @return $pages Number of pages for group history
 	 */
 	public function GetLastPage(\DOMDocument $doc) {
-            $xpath = new \DOMXPath($doc);
-            /* @var $elements \DOMNodeList */
-            $elements = $xpath->query("//*/a[@class='pagelink']");
-            /* @var $pagelink \DOMElement */
-            $pagelink = $elements->item($elements->length - 1);
-            return $pagelink->textContent;
+		$xpath = new \DOMXPath($doc);
+		/* @var $elements \DOMNodeList */
+		$elements = $xpath->query("//*/a[@class='pagelink']");
+		/* @var $pagelink \DOMElement */
+		$pagelink = $elements->item($elements->length - 1);
+		return $pagelink->textContent;
 	}
 	
 	/**
@@ -429,95 +402,12 @@ class Feed {
 	 * 
 	 * @return The number of history items reported by the page.
 	 */
-	private function GetItemCount() {
-		curl_setopt($this->curlID, CURLOPT_URL, "https://steamcommunity.com/groups/" . $this->group  . "/history");
-		$content = curl_exec($this->curlID);
-		$location = strpos($content,'History Items');
-		
-		$end = $location - 1;
-		while (substr($content,$end,1) != '>')
-			$end--;
-		$div = substr($content,$end + 1,$location - $end);
-		unset($content);
-		
-		$history_location = 0;
-		$items = explode(" ",$div);
-		foreach ($items as $item)
-			if (is_numeric($item))
-				if ($history_location < $item)
-					$history_location = $item;
-		
-		return $history_location;
-	}
-	
-	/**
-	 * Converts Steam's date format (without year) to an ISO 8601 format
-	 * 
-	 * @param $date The date in Steam's format, trimmed
-	 * @return The date in ISO 8601 format
-	 */
-	private function convertSteamDate($steamdate) {
-		//echo $steamdate . "<br />\n";
-		// Start with year
-		$date = $this->year . "-";
-		
-		// Turn the Steam date into an array
-		$expdate = explode(" ",$steamdate);
-		
-		# Convert the month to a number and
-		# import into the class to check for
-		# year retrogression
-		$month = $this->months[$expdate[0]];
-		if ($this->month == "")
-			$this->month = $month;
-		else if ($this->month != $month)
-			$this->month--;
-		if ($this->month <= 0) {
-			$this->year--;
-			$this->month = "";
-		}
-		
-		//echo $this->year . "<br />";
-		//echo $this->month . "<br />";
-		
-		# Remove letters from the day and store it
-		# Ensure that it has a leading zero
-		$day = preg_replace("[^0-9]", "", $expdate[1]);
-		if ((int) $day < 10)
-			$day = "0" . $day;
-		
-		# Add month and day to date
-		$date .= $month . "-" . $day . " ";
-		
-		# Set the time, get the meridian, remove the
-		# meridian, add 12 hours if necessary, add a
-		# zero if necessary, and concatenate
-		$time = $expdate[3];
-		//$timelen = strlen($time);
-		$meridian = preg_replace("[^a-z]","",$time);
-		//$meridian = substr($time,$timelen - 2,$timelen);
-		//echo $meridian . "<br />";
-		$time = preg_replace("[a-z]","",$time);
-		//echo $time . "<br />";
-		//$time = substr($time,0,$timelen - 2);
-		$time = explode(":",$time);
-		//echo $time[0] . "<br />\n";
-		if ($meridian == "pm")
-			$time[0] += 12;
-		elseif ($meridian == "am" && $time[0] == 12)
-			$time[0] -= 12;
-		//echo $time[0] . "<br />\n";
-		$time[0] += self::OFFSET; // Add the hour offset that cURL has
-		if ((int) $time[0] >= 24)
-			$time[0] -= 24; // If the hour offset goes over 24
-		elseif ((int) $time[0] < 10)
-			$time[0] = "0" . $time[0]; // Leading zeros
-		$time = $time[0] . ":" . $time[1]; // Implode array
-		$date .= $time . ":00"; // Add seconds
-		//print_r($expdate);
-		//echo "<br />\n";
-		
-		//echo $date . "<br />\n";
-		return $date;
+	public function GetItemCount(\DOMDocument $doc) {
+		$xpath = new \DOMXPath($doc);
+		/* @var $elements \DOMNodeList */
+		$p = $xpath->query("//*/div[@class='group_paging']/p")->item(0);
+		/* @var $pagelink \DOMElement */
+		$parts = explode(' ', $p->textContent);
+		return $parts[4];
 	}
 }

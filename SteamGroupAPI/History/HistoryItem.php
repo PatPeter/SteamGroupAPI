@@ -12,33 +12,26 @@ class HistoryItem {
 	public $day;
 	public $time;
 	public $source = '';
-	public $source_url = '';
+	public $source_steam_id = '';
 	public $target = '';
-	public $target_url = '';
-	
-	public function unsetall() {
-		unset($this->id);
-		unset($this->img);
-		unset($this->title);
-		unset($this->date);
-		$this->source     = '';
-		$this->source_url = '';
-		$this->target     = '';
-		$this->target_url = '';
-	}
+	public $target_steam_id = '';
 	
 	public function __toString() {
-		$return = "( '$this->id', '$this->img', '$this->title', '$this->date', '$this->source', '$this->source_url', ";
-		if ($this->target != '')
-			if ($this->target_url != '')
-				if ($this->target_url != "NULL")
-					$return .= "'$this->target', '$this->target_url' )";
-				else
-					$return .= "'$this->target', NULL )";
-			else
-				$return .= "'$this->target', NULL )";
-		else
-			$return .= 'NULL, NULL )';
-		return $return;
+		$s = "";
+		
+		foreach ($this as $value) {
+			if ($value == null) {
+				$value = 'NULL';
+			}
+			
+			if (strlen($s) == 0) {
+				$s .= '( "' . $value . '"';
+			} else {
+				$s .= ' , "' . $value . '"';
+			}
+		}
+		$s .= ' )';
+		
+		return $s;
 	}
 }
