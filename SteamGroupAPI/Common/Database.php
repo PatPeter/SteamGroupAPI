@@ -1,6 +1,8 @@
 <?php
 namespace SteamGroupAPI\Common;
 
+use SteamGroupAPI\History\HistoryItem;
+
 class Database {
 	private $hostname = '';
 	private $port	  = '';
@@ -8,22 +10,39 @@ class Database {
 	private $password = '';
 	private $database = '';
 	
+	/* @var $instance \PDO */
 	private $instance = null;
 	
-	public function __construct() {
-		$dsn = "mysql:host=$this->host;port=$this->port;dbname=$this->database;charset=utf8mb4";
+	public function init() {
+		$dsn = "mysql:host=$this->hostname;port=$this->port;dbname=$this->database;charset=utf8mb4";
 		try {
 			$this->instance = new \PDO($dsn, $this->username, $this->password, array(\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION));
+			//$this->instance->query('SELECT 1 + 1');
 		} catch (\PDOException $ex) {
-			print_r($ex);
+			print_r($ex->getTraceAsString());
+			die($ex->getMessage());
 		}
 	}
 	
-	public function get_last_row() {
+	public function get_last_row($group_id) {
 		try {
-			$stmt = $this->instance->query('SELECT * FROM group_history WHERE group_id = 103582791430024497 ORDER BY history_id DESC LIMIT 1');
-			$stmt->bindValue(1, 103582791430024497);
+			/* @var $this->instance \PDO */
+			/* @var $stmt \PDOStatement */
+			$stmt = $this->instance->prepare('SELECT * FROM group_history WHERE group_id = ? ORDER BY history_id DESC LIMIT 1', array(\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION));
+			var_dump($stmt);
+			if ($stmt === false) {
+				error_log($this->instance->errorCode());
+				error_log($this->instance->errorInfo());
+			}
+			$stmt->bindParam(1, $group_id);
+			var_dump($stmt);
+			$stmt->setFetchMode(\PDO::FETCH_CLASS, '\SteamGroupAPI\History\HistoryItem');
+			$stmt->execute([$group_id]);
 			$last_row = $stmt->fetch();
+			if ($last_row === false) {
+				error_log($this->instance->errorCode());
+				print_r($this->instance->errorInfo());
+			}
 			return $last_row;
 		} catch (\PDOException $e) {
 			print_r($e->getMessage());

@@ -16,6 +16,12 @@ class HistoryItem {
 	public $target = '';
 	public $target_steam_id = '';
 	
+	public function __construct() {
+		//$this->group_id = $group_id;
+		//$this->history_id = $history_id;
+		//$this->type_id = $type_id;
+	}
+	
 	public function __toString() {
 		$s = "";
 		

@@ -11,7 +11,7 @@ use \SteamGroupAPI\Common\Authenticator;
 use \SteamGroupAPI\History\Feed;
 use \SteamGroupAPI\History\HistoryItem;
 
-error_reporting(E_ERROR | E_PARSE);
+//error_reporting(E_ERROR | E_WARNING | E_PARSE);
 
 //$content = file_get_contents("Steam Community __ Group __ Universal Gaming Alliance.html");
 //echo $content;
@@ -83,11 +83,16 @@ if ($curl === false) {
 $content = $curl->get('https://steamcommunity.com/groups/unigamia/history');
 error_log($content);*/
 
+date_default_timezone_set('America/Chicago');
+
 $db = new Database();
-$last_row = $db->get_last_row();
+$db->init();
+$last_row = $db->get_last_row("103582791430024497");
 var_dump($last_row);
 if ($last_row === false) {
-	die("No database.");
+	//$mysqli = new mysqli("", "", "", "");
+	//$result = $mysqli->query('SELECT * FROM group_history WHERE group_id = 103582791430024497 ORDER BY history_id DESC LIMIT 1');
+	print_r($result->fetch_assoc());
 }
 
 $doc = new \DOMDocument();
@@ -116,22 +121,21 @@ for ($i = 0; $i < count($history_items); $i++) {
 	error_log($history_item->month . '==' . $last_row->month);
 	error_log($history_item->day . '==' . $last_row->day);
 	error_log($history_item->time . '==' . $last_row->time);
-	if ($history_item->type_id == $last_row['type_id'] && 
-		$history_item->month == $last_row['month'] && 
-		$history_item->day == $last_row['day'] && 
-		$history_item->time == $last_row['time'])
+	if ($history_item->type_id == $last_row->type_id && 
+		$history_item->month == $last_row->month && 
+		$history_item->day == $last_row->day && 
+		$history_item->time == $last_row->time)
 	{
 		$located = $i;
-	} else {
-		
 	}
 }
 
 if ($located !== false) {
-	print_r($located);
-	$history_items = array_slice($history_items, $i);
-	//print_r($history_items);
+	error_log("LOCATED");
+	error_log($located);
+	error_log(count($history_items));
+	$history_items = array_slice($history_items, $located);
+	print_r($history_items);
 }
-
 
 $feed->Update($doc, $history_items);
