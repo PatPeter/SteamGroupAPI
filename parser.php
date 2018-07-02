@@ -3,91 +3,26 @@
 require_once 'vendor/autoload.php';
 require_once 'Autoloader.php';
 
-use \phpseclib\Crypt\RSA;
-use \phpseclib\Math\BigInteger;
 use \Curl\Curl;
 use \SteamGroupAPI\Common\Database;
 use \SteamGroupAPI\Common\Authenticator;
 use \SteamGroupAPI\History\Feed;
 use \SteamGroupAPI\History\HistoryItem;
 
-//error_reporting(E_ERROR | E_WARNING | E_PARSE);
+error_reporting(E_ERROR | E_PARSE);
 
 //$content = file_get_contents("Steam Community __ Group __ Universal Gaming Alliance.html");
 //echo $content;
 
-/*define('CRYPT_RSA_PKCS15_COMPAT', true);  // May not be necessary, but never hurts to be sure.
-
-$url_rsa = 'https://steamcommunity.com/login/getrsakey/?username=';
-$username = "";  // Insert bot's username here.
-$password = "";  // Insert bot's password here.
-
-
-// Skip the extra work of POST'ing the data, just GET'ing the url works fine and saves space
-$result = file_get_contents($url_rsa . $username);
-$result = json_decode($result);
-
-if ($result->success){
-    echo "Got Info!<br/><br/>";
-} else if (!$result->success){            // Remove comment markers during testing
-    echo "Unable to grab Info<br/><br/>"; // You can also use this to log errors to a database or email you if needed.
-}
-
-//echo var_dump($result);
-// More testing code, just to help you see what's going on.
-//echo "<br/><br/>";
-
-$rsa = new RSA();
-$rsa->setEncryptionMode(CRYPT_RSA_ENCRYPTION_PKCS1);
-$key = array(
-    'n' => new BigInteger($result->publickey_mod,16),
-    'e' => new BigInteger($result->publickey_exp,16) // Fixed base :)
-);
-$rsa->loadKey($key);
-$password = base64_encode($rsa->encrypt($password)); // Steam uses Base64_Encode()
-
-//echo "Password Encrypted: " . $password . "<br/><br/>";
-// Should look like numbers and letters, any 'weird' characters shouldn't be here
-
-$data = array(
-    'username' => $username,
-    'password' => $password,
-    'twofactorcode'=> "",
-    'emailauth'=> "", 
-    'loginfriendlyname'=> "", 
-    'captchagid'=> "",         // If all goes well, you shouldn't need to worry
-    'captcha_text'=> "",       // about Captcha.
-    'emailsteamid'=> "", 
-    'rsatimestamp'=> $result->timestamp, 
-    'remember_login'=> "false" 
-);
-$options = array(
-    'http' => array(
-        'header'  => "Content-type: application/x-www-form-urlencoded\r\n",
-        'method'  => 'POST',
-        'content' => http_build_query($data),
-    ),
-);
-
-$url="https://steamcommunity.com/login/dologin/";
-
-$context  = stream_context_create($options);
-$result = file_get_contents($url, false, $context);
-$result = json_decode($result);
-print_r($result);*/
-
-/*$curl = SteamGroupAPI\Common\Authentication::login("", "");
-if ($curl === false) {
+$curl = SteamGroupAPI\Common\Authentication::login("", "");
+if ($curl === false || !SteamGroupAPI\Common\Authentication::is_logged($curl)) {
 	die("Could not log into Steam.");
 }
-$content = $curl->get('https://steamcommunity.com/groups/unigamia/history');
-error_log($content);*/
 
 date_default_timezone_set('America/Chicago');
 
-$db = new Database();
-$db->init();
-$last_row = $db->get_last_row("103582791430024497");
+$db = Database::getInstance();
+$last_row = $db->getLastRow("103582791430024497");
 var_dump($last_row);
 if ($last_row === false) {
 	//$mysqli = new mysqli("", "", "", "");
@@ -95,15 +30,23 @@ if ($last_row === false) {
 	print_r($result->fetch_assoc());
 }
 
-$doc = new \DOMDocument();
-$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");
-//$doc->loadHTML($content);
+$history_url = 'https://steamcommunity.com/groups/unigamia/history';
+$content = $curl->get($history_url);
 
-$feed = new Feed("unigamia", "uga", 2014);
+$doc = new \DOMDocument();
+//$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");
+$doc->loadHTML($content);
+
+//error_log($content);
+
+$feed = new Feed("unigamia", "uga", 2009);
 //$history_item = new HistoryItem();
 //$page_number = 23;
 
 $last_page = $feed->GetLastPage($doc);
+if (!is_numeric($last_page)) {
+	die('Last page could not be detected! Exiting.');
+}
 
 error_log("Starting from last page..." . $last_page);
 
@@ -111,31 +54,75 @@ $total_items = $feed->GetItemCount($doc);
 
 error_log("With total items..." . $total_items);
 
-$history_items = $feed->ParsePage($doc, 0, 0);
+// Was breaking parsing below
+//$history_items = $feed->ParsePage($doc);
 
-$i = null;
+$content_cache = array();
+$history_cache = array();
+
 $located = false;
-for ($i = 0; $i < count($history_items); $i++) {
-	$history_item = $history_items[$i];
-	error_log($history_item->type_id . '==' . $last_row->type_id);
-	error_log($history_item->month . '==' . $last_row->month);
-	error_log($history_item->day . '==' . $last_row->day);
-	error_log($history_item->time . '==' . $last_row->time);
-	if ($history_item->type_id == $last_row->type_id && 
-		$history_item->month == $last_row->month && 
-		$history_item->day == $last_row->day && 
-		$history_item->time == $last_row->time)
-	{
-		$located = $i;
+$history_id = $last_row->history_id;
+for ($p = $last_page; $p > 0; $p--) {
+	$content = $curl->get($history_url . '?p=' . $p);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+	$content_cache[$p] = $content;
+	//error_log($content);
+	
+	$doc = new \DOMDocument();
+	//$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");
+	$doc->loadHTML($content);
+	$history_items = $feed->ParsePage($doc);
+	$history_cache[$p] = $history_items;
+	
+	for ($i = 0; $i < count($history_items); $i++) {
+		$history_item = $history_items[$i];
+		if (HistoryItem::compare($history_item, $last_row)) {
+			$located = $i;
+			break;
+		}
 	}
-}
 
-if ($located !== false) {
-	error_log("LOCATED");
-	error_log($located);
-	error_log(count($history_items));
-	$history_items = array_slice($history_items, $located);
-	print_r($history_items);
+	if (is_numeric($located)) {
+		error_log("LOCATED");
+		error_log($located);
+		error_log(count($history_items));
+		$history_items = array_slice($history_items, $located + 1);
+		$located = true;
+	}
+	//print_r($history_items);
+	
+	if ($located === true) {
+		for ($i = 0; $i < count($history_items); $i++) {
+			$history_item = $history_items[$i];
+			$history_item->history_id = ++$history_id;
+			$feed->setHistoryID($history_id);
+		}
+		for ($i = 0; $i < count($history_items); $i++) {
+			$history_item = $history_items[$i];
+			//error_log("Inseting history item...");
+			//print_r($history_item);
+			$db->insertHistoryItem($history_item);
+		}
+	}
 }
 
 $feed->Update($doc, $history_items);

@@ -6,50 +6,24 @@ use SteamGroupAPI\Common\SteamBase;
 
 class Feed {
 	const OFFSET = 2; // Offset for the time zone cURL fetches
-	const BR = "<br />\n";
-	const PREFIX = "[SteamGroupAPI] ";
-	
-	private $authcode  = ""; // For "enter your code here"
-	
-	#private $users     = array(
-	#							"" => ""
-	#					 );
 	
 	/**
 	 * 
 	 * Program Modified Connection Variables
 	 * 
 	 */
-	/* @var $connection \MySQLi */
-	private $connection;
 	private $group = '';
-	private $table = '';
-	//private $sb = '';
-	
-	private $curlID = null;
-	private $options = null;
+	private $group_id = null;
+	private $history_id = 0;
 	
 	/**
 	 * 
 	 * Date Variables
 	 * 
 	 */
-	private $year   = 2012;
-	private $month  = '';
-	private $months = array(
-		'January' => '01',
-		'February' => '02',
-		'March' => '03',
-		'April' => '04',
-		'May' => '05',
-		'June' => '06',
-		'July' => '07',
-		'August' => '08',
-		'September' => '09',
-		'October' => '10',
-		'November' => '11',
-		'December' => '12'
-	);
+	private $year_offset = 0;
+	private $first_year = null;
+	private $last_month  = null;
 	
 	/**
 	 * 
@@ -156,12 +130,21 @@ class Feed {
 	 * @param $group The group's short URL.
 	 * @param $table The table to store and call data from.
 	 */
-	public function __construct($group, $table, $year) {
-		$this->year = $year;
+	public function __construct($group, $table, $first_year) {
+		$this->first_year = $first_year;
 		// TODO: Generate group_id with XML cURL get
 	}
 	
 	public function __destruct() { }
+	
+	public function getHistoryID() {
+		return $this->history_id;
+	}
+	
+	public function setHistoryID($history_id) {
+		$this->history_id = $history_id;
+		return $this;
+	}
 	
 	public function __toString() {
 		echo self::PREFIX . "Feed Exists!" . self::BR;
@@ -281,21 +264,21 @@ class Feed {
 		
 	}
 	
-	public function ParsePage(\DOMDocument $doc, $yearOffset, $lastMonth) { // http://www.php.net/manual/en/language.references.pass.php
+	public function ParsePage(\DOMDocument $doc, $search_item = null) { // http://www.php.net/manual/en/language.references.pass.php
 		$history_items = array();
 
 		$xpath = new \DOMXPath($doc);
 		/* @var $divs \DOMNode */
 		$divs = $xpath->query("//*/div[@class='historyItem' or @class='historyItemb']");
 		
-		//$yearOffset = 0;
-		//$lastMonth = 0;
+		//$year_offset = 0;
+		//$last_month = 0;
 		for ($i = $divs->length - 1; -1 < $i; $i--) {
 			/* @var $div \DOMElement */
 			$div = $divs->item($i);
 			$history_item = new HistoryItem();
 			$history_item->group_id = "103582791430024497";
-			$history_item->history_id = $i + 1;
+			//$history_item->history_id = ++$this->history_id;
 			$processedNodes = array();
 			/* @var $childNode \DOMElement */
 			foreach ($div->childNodes as $childNode) {
@@ -325,19 +308,33 @@ class Feed {
 							}
 							$month = $dateParts->format('m');
 							$day = $dateParts->format('d');
-							if ($month > $lastMonth) {
-								$lastMonth = $month;
-							} else if ($month < $lastMonth) {
-								$yearOffset++;
-								$lastMonth = $month;
+							if ($month > $this->last_month) {
+								$this->last_month = $month;
+								error_log('**************************************************');
+								error_log('NEW MONTH DETECTED');
+								error_log($month . '>' . $this->last_month);
+								error_log('**************************************************');
+							} else if ($month < $this->last_month) {
+								error_log('**************************************************');
+								error_log('**************************************************');
+								error_log('**************************************************');
+								error_log('NEW YEAR DETECTED');
+								error_log($month . '<' . $this->last_month);
+								error_log($this->year_offset + 1);
+								error_log('**************************************************');
+								error_log('**************************************************');
+								error_log('**************************************************');
+								
+								$this->year_offset++;
+								$this->last_month = $month;
 							}
-							$history_item->year_offset = $yearOffset;
-							$history_item->month = $month;
-							$history_item->day = $day;
+							$history_item->year_offset = $this->year_offset;
+							$history_item->month = (int) $month;
+							$history_item->day = (int) $day;
 							$history_item->time = $dateParts->format("H:i:s");
 							
-							$dateParts->setDate($this->year + $yearOffset, $month, $day);
-							$history_item->date = $dateParts->format("Y-m-d H:i:s");
+							$dateParts->setDate($this->first_year + $this->year_offset, $month, $day);
+							$history_item->display_date = $dateParts->format("Y-m-d H:i:s");
 							//$div->removeChild($childNode);
 							$processedNodes[] = $childNode;
 							break;
@@ -347,14 +344,16 @@ class Feed {
 							break;
 
 						case "whiteLink":
-							if ($history_item->source == '') {
-								$history_item->source = $childNode->textContent;
-								$history_item->source_steam_id = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
+							if ($history_item->source_name == '') {
+								$history_item->source_name = $childNode->textContent;
+								$steam_id = new \SteamID('[U:1:' . $childNode->attributes->getNamedItem("data-miniprofile")->textContent . ']');
+								$history_item->source_steam_id =  $steam_id->ConvertToUInt64();
 							} else {
-								$history_item->target = $history_item->source;
+								$history_item->target_name = $history_item->source_name;
 								$history_item->target_steam_id = $history_item->source_steam_id;
-								$history_item->source = $childNode->textContent;
-								$history_item->source_steam_id = $childNode->attributes->getNamedItem("data-miniprofile")->textContent;
+								$history_item->source_name = $childNode->textContent;
+								$steam_id = new \SteamID('[U:1:' . $childNode->attributes->getNamedItem("data-miniprofile")->textContent . ']');
+								$history_item->source_steam_id = $steam_id->ConvertToUInt64();
 							}
 							$processedNodes[] = $childNode;
 							break;
@@ -370,7 +369,7 @@ class Feed {
 			if (strpos($childNode->textContent, '"') !== false) {
 				$endQuote = strpos($childNode->textContent, '"', $startQuote + 1);
 				$eventName = substr($childNode->textContent, $startQuote + 1, $endQuote - ($startQuote + 1));
-				$history_item->target = $eventName;
+				$history_item->target_name = $eventName;
 			}
 			
 			//error_log("HISTORY DETAILS: " . trim($doc->saveHtml($div)));

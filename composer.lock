@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#composer-lock-the-lock-file",
         "This file is @generated automatically"
     ],
-    "content-hash": "324d8f7e48e3898cf934ae3276f7d759",
+    "content-hash": "93adb01d8f364fa760e69ecc54eef43f",
     "packages": [
         {
             "name": "php-curl-class/php-curl-class",
@@ -67,20 +67,20 @@
         },
         {
             "name": "phpseclib/phpseclib",
-            "version": "2.0.11",
+            "version": "1.0.11",
             "source": {
                 "type": "git",
                 "url": "https://github.com/phpseclib/phpseclib.git",
-                "reference": "7053f06f91b3de78e143d430e55a8f7889efc08b"
+                "reference": "fd33675e483b887fc59834ab69e33ef7f2706425"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/7053f06f91b3de78e143d430e55a8f7889efc08b",
-                "reference": "7053f06f91b3de78e143d430e55a8f7889efc08b",
+                "url": "https://api.github.com/repos/phpseclib/phpseclib/zipball/fd33675e483b887fc59834ab69e33ef7f2706425",
+                "reference": "fd33675e483b887fc59834ab69e33ef7f2706425",
                 "shasum": ""
             },
             "require": {
-                "php": ">=5.3.3"
+                "php": ">=5.0.0"
             },
             "require-dev": {
                 "phing/phing": "~2.7",
@@ -90,20 +90,27 @@
             },
             "suggest": {
                 "ext-gmp": "Install the GMP (GNU Multiple Precision) extension in order to speed up arbitrary precision integer arithmetic operations.",
-                "ext-libsodium": "SSH2/SFTP can make use of some algorithms provided by the libsodium-php extension.",
-                "ext-mcrypt": "Install the Mcrypt extension in order to speed up a few other cryptographic operations.",
-                "ext-openssl": "Install the OpenSSL extension in order to speed up a wide variety of cryptographic operations."
+                "ext-mcrypt": "Install the Mcrypt extension in order to speed up a wide variety of cryptographic operations.",
+                "pear-pear/PHP_Compat": "Install PHP_Compat to get phpseclib working on PHP < 5.0.0."
             },
             "type": "library",
             "autoload": {
+                "psr-0": {
+                    "Crypt": "phpseclib/",
+                    "File": "phpseclib/",
+                    "Math": "phpseclib/",
+                    "Net": "phpseclib/",
+                    "System": "phpseclib/"
+                },
                 "files": [
-                    "phpseclib/bootstrap.php"
-                ],
-                "psr-4": {
-                    "phpseclib\\": "phpseclib/"
-                }
+                    "phpseclib/bootstrap.php",
+                    "phpseclib/Crypt/Random.php"
+                ]
             },
             "notification-url": "https://packagist.org/downloads/",
+            "include-path": [
+                "phpseclib/"
+            ],
             "license": [
                 "MIT"
             ],
@@ -155,7 +162,7 @@
                 "x.509",
                 "x509"
             ],
-            "time": "2018-04-15T16:55:05+00:00"
+            "time": "2018-04-15T16:51:35+00:00"
         },
         {
             "name": "xpaw/steamid",

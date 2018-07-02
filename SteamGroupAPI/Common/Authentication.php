@@ -6,15 +6,24 @@ use \phpseclib\Crypt\RSA;
 use \phpseclib\Math\BigInteger;
 
 class Authentication {
-	static function login($username, $password) {
+	public static function login($username, $password) {
 		// If username or password aren't set then return false
 		if (!isset($username) || !isset($password))	return false;
 		// Set variables
 		$donotcache = round(microtime(true)*1000);
 		// Define class Curl() in variable $curl
 		$curl = new Curl();
+		$curl->setCookieJar(sys_get_temp_dir() . '/cookies.txt');
+		$curl->setCookieFile(sys_get_temp_dir() . '/cookies.txt');
+		file_put_contents(sys_get_temp_dir() . '/cookies.txt', 'steamcommunity.com	FALSE	/	FALSE	0	timezoneOffset	-18000,0', FILE_APPEND | LOCK_EX, null);
+		// -18000 GMT-06:00
+		//$curl->setCookieString('steamcommunity.com	FALSE	/	FALSE	0	timezoneOffset	-18000,0');
+		if (Authentication::is_logged($curl)) {
+			return $curl;
+		}
+		
 		// Define class Crypt_RSA in variable $rsa
-		$rsa = new RSA();
+		$rsa = new \Crypt_RSA();
 		// Retrieve RSA key
 		$curl->post('https://steamcommunity.com/login/getrsakey/', array(
 			'donotcache'	=>	$donotcache,
@@ -27,8 +36,8 @@ class Authentication {
 		// Encrypt password
 		// Set keys
 		$key = array(
-			'n' => new BigInteger($curl->response->publickey_mod,16),
-			'e' => new BigInteger($curl->response->publickey_exp,16),
+			'n' => new \Math_BigInteger($curl->response->publickey_mod,16),
+			'e' => new \Math_BigInteger($curl->response->publickey_exp,16),
 		);
 		// Define exponent
 		define('CRYPT_RSA_EXPONENT', 010001);
@@ -49,12 +58,16 @@ class Authentication {
 			'username'		=>	$username,
 			'rsatimestamp'	=>	$rsatimestamp
 		));
+		var_dump($curl->response);
 		// If login failed then return false
 		if ($curl->response->success != true) {
 			error_log('Do Login was not successful.');
 			print_r($curl->response);
 			return false;
 		}
+		$curl->setCookie('timezoneOffset', '-18000,0');
+		$curl->setCookie('timezoneOffset-steamcommunity.com', '-18000,0');
+		
 		// Setup transfer variables
 		$steamid		=	$curl->response->transfer_parameters->steamid;
 		$token 			=	$curl->response->transfer_parameters->token;
@@ -88,7 +101,8 @@ class Authentication {
 		// If all else was a success, return true
 		return $curl;
 	}
-	static function is_logged($curl){
+	public static function is_logged($curl){
+		print_r($curl->get('http://steamcommunity.com/actions/GetNotificationCounts'));
 		return ($curl->get('http://steamcommunity.com/actions/GetNotificationCounts') != "null");
 	}
 }
