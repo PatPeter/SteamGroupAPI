@@ -3,22 +3,23 @@
 require_once 'vendor/autoload.php';
 require_once 'Autoloader.php';
 
-use \Curl\Curl;
+//use \Curl\Curl;
 use \SteamGroupAPI\Common\Database;
-use \SteamGroupAPI\Common\Authenticator;
+use \SteamGroupAPI\Common\Authentication;
 use \SteamGroupAPI\History\Feed;
 use \SteamGroupAPI\History\HistoryItem;
 
-error_reporting(E_ERROR | E_PARSE);
+error_reporting(E_ERROR | E_WARNING | E_PARSE);
 
 //$content = file_get_contents("Steam Community __ Group __ Universal Gaming Alliance.html");
 //echo $content;
 
-$curl = SteamGroupAPI\Common\Authentication::login("", "");
-if ($curl === false || !SteamGroupAPI\Common\Authentication::is_logged($curl)) {
+$curl = Authentication::login("", "");
+if ($curl === false || !Authentication::is_logged($curl)) {
 	die("Could not log into Steam.");
 }
 
+error_log("Reporting");
 date_default_timezone_set('America/Chicago');
 
 $db = Database::getInstance();
@@ -31,14 +32,32 @@ if ($last_row === false) {
 }
 
 $history_url = 'https://steamcommunity.com/groups/unigamia/history';
+$curl->setHeader('Content-type', 'text/html; charset=UTF-8');
+$curl->setOpt(CURLOPT_ENCODING , 'UTF-8');
 $content = $curl->get($history_url);
+$content = utf8_decode($content);
+//error_log($content);
 
-$doc = new \DOMDocument();
+$doc = new \DOMDocument('1.0', 'utf-8');
 //$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");
-$doc->loadHTML($content);
+$content  = mb_convert_encoding($content , 'HTML-ENTITIES', 'UTF-8');
+@$doc->loadHTML($content);
 
 //error_log($content);
 
+/*
+INSERT INTO uga_libsteam.group_history 
+SELECT 103582791430024497, id, `type`, title, date, 
+DATE_FORMAT(date, '%Y') - 2009, DATE_FORMAT(date, '%m'), DATE_FORMAT(date, '%d'), DATE_FORMAT(date,'%H:%i:%s'),
+source, sourceID, target, targetID
+FROM uga_libsteam.uga;
+
+SET SQL_SAFE_UPDATES = FALSE;
+UPDATE uga_libsteam.group_history SET
+  source_name = CONVERT(CAST(CONVERT(source_name USING 'latin1') AS BINARY) USING 'utf8mb4'),
+  target_name = CONVERT(CAST(CONVERT(target_name USING 'latin1') AS BINARY) USING 'utf8mb4')
+  WHERE history_id != 440;
+ */
 $feed = new Feed("unigamia", "uga", 2009);
 //$history_item = new HistoryItem();
 //$page_number = 23;
@@ -63,7 +82,13 @@ $history_cache = array();
 $located = false;
 $history_id = $last_row->history_id;
 for ($p = $last_page; $p > 0; $p--) {
+	//$curl->setHeader('Content-type', 'text/html; charset=UTF-8');
+	//$curl->setOpt(CURLOPT_ENCODING , 'UTF-8');
 	$content = $curl->get($history_url . '?p=' . $p);
+	$content  = mb_convert_encoding($content , 'HTML-ENTITIES', 'UTF-8');
+	//$content = utf8_decode($content);
+	//$content = iconv('ISO-8859-1', 'UTF-8', $content);
+	file_put_contents("page" . $p.'.html', $content);
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
@@ -85,11 +110,14 @@ for ($p = $last_page; $p > 0; $p--) {
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 	$content_cache[$p] = $content;
-	//error_log($content);
+	error_log($content);
 	
-	$doc = new \DOMDocument();
+	$doc = new \DOMDocument('1.0', 'utf-8');
 	//$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");
-	$doc->loadHTML($content);
+	@$doc->loadHTML($content);
+	//file_put_contents('page' . $p . '.html', $doc->saveHTML());
+	//break;
+	
 	$history_items = $feed->ParsePage($doc);
 	$history_cache[$p] = $history_items;
 	

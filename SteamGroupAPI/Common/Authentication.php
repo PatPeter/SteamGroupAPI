@@ -18,9 +18,9 @@ class Authentication {
 		file_put_contents(sys_get_temp_dir() . '/cookies.txt', 'steamcommunity.com	FALSE	/	FALSE	0	timezoneOffset	-18000,0', FILE_APPEND | LOCK_EX, null);
 		// -18000 GMT-06:00
 		//$curl->setCookieString('steamcommunity.com	FALSE	/	FALSE	0	timezoneOffset	-18000,0');
-		if (Authentication::is_logged($curl)) {
-			return $curl;
-		}
+		//if (Authentication::is_logged($curl)) {
+			//return $curl;
+		//}
 		
 		// Define class Crypt_RSA in variable $rsa
 		$rsa = new \Crypt_RSA();

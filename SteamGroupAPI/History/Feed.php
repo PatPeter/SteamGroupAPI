@@ -365,10 +365,10 @@ class Feed {
 			}
 			
 			// Event code
-			$startQuote = strpos($childNode->textContent, '"');
-			if (strpos($childNode->textContent, '"') !== false) {
-				$endQuote = strpos($childNode->textContent, '"', $startQuote + 1);
-				$eventName = substr($childNode->textContent, $startQuote + 1, $endQuote - ($startQuote + 1));
+			$startQuote = mb_strpos($childNode->textContent, '"', null, 'UTF-8');
+			if (mb_strpos($childNode->textContent, '"', null, 'UTF-8') !== false) {
+				$endQuote = mb_strpos($childNode->textContent, '"', $startQuote + 1, 'UTF-8');
+				$eventName = mb_substr($childNode->textContent, $startQuote + 1, $endQuote - ($startQuote + 1), 'UTF-8');
 				$history_item->target_name = $eventName;
 			}
 			

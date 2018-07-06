@@ -56,8 +56,9 @@ class HistoryItem {
 			return false;
 		}
 		error_log('Match found!');
-		print_r($a);
-		print_r($b);
+		// Cannot print out 4-byte Unicode characters in Command Prompt w/o crash
+		//print_r($a);
+		//print_r($b);
 		return true;
 	}
 	

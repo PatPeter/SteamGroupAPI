@@ -8,7 +8,7 @@ class Database {
 	private $port	  = '3306';
 	private $username = '';
 	private $password = '';
-	private $database = '';
+	private $database = 'uga_libsteam';
 	
 	/* @var $pdo \PDO */
 	public $pdo = null;
@@ -23,7 +23,8 @@ class Database {
 	private function __construct() {
 		$dsn = "mysql:host=$this->hostname;port=$this->port;dbname=$this->database;charset=utf8mb4";
 		try {
-			$this->pdo = new \PDO($dsn, $this->username, $this->password, array(\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION));
+			$this->pdo = new \PDO($dsn, $this->username, $this->password, array(\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::MYSQL_ATTR_INIT_COMMAND => 'SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci'));
+			$this->pdo->exec('SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;');
 			//$this->instance->query('SELECT 1 + 1');
 		} catch (\PDOException $e) {
 			print_r($e->getMessage());
@@ -78,11 +79,10 @@ class Database {
 			$stmt->bindParam(7, $history_item->month);
 			$stmt->bindParam(8, $history_item->day);
 			$stmt->bindParam(9, $history_item->time);
-			$stmt->bindParam(10, $history_item->source_name);
+			$stmt->bindParam(10, html_entity_decode($history_item->source_name));
 			$stmt->bindParam(11, $history_item->source_steam_id);
-			$stmt->bindParam(12, $history_item->target_name);
+			$stmt->bindParam(12, html_entity_decode($history_item->target_name));
 			$stmt->bindParam(13, $history_item->target_steam_id);
-			//var_dump($stmt);
 			return $stmt->execute();
 		} catch (\PDOException $e) {
 			print_r($e->getMessage());
