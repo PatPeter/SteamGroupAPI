@@ -264,7 +264,7 @@ class Feed {
 		
 	}
 	
-	public function ParsePage(\DOMDocument $doc, $search_item = null) { // http://www.php.net/manual/en/language.references.pass.php
+	public function ParsePage(\DOMDocument $doc, &$last_row = null) { // http://www.php.net/manual/en/language.references.pass.php
 		$history_items = array();
 
 		$xpath = new \DOMXPath($doc);
@@ -278,7 +278,9 @@ class Feed {
 			$div = $divs->item($i);
 			$history_item = new HistoryItem();
 			$history_item->group_id = "103582791430024497";
-			//$history_item->history_id = ++$this->history_id;
+			if ($last_row == null) {
+				$history_item->history_id = ++$this->history_id;
+			}
 			$processedNodes = array();
 			/* @var $childNode \DOMElement */
 			foreach ($div->childNodes as $childNode) {
@@ -310,20 +312,12 @@ class Feed {
 							$day = $dateParts->format('d');
 							if ($month > $this->last_month) {
 								$this->last_month = $month;
-								error_log('**************************************************');
 								error_log('NEW MONTH DETECTED');
 								error_log($month . '>' . $this->last_month);
-								error_log('**************************************************');
 							} else if ($month < $this->last_month) {
-								error_log('**************************************************');
-								error_log('**************************************************');
-								error_log('**************************************************');
 								error_log('NEW YEAR DETECTED');
 								error_log($month . '<' . $this->last_month);
 								error_log($this->year_offset + 1);
-								error_log('**************************************************');
-								error_log('**************************************************');
-								error_log('**************************************************');
 								
 								$this->year_offset++;
 								$this->last_month = $month;
@@ -348,6 +342,8 @@ class Feed {
 								$history_item->source_name = $childNode->textContent;
 								$steam_id = new \SteamID('[U:1:' . $childNode->attributes->getNamedItem("data-miniprofile")->textContent . ']');
 								$history_item->source_steam_id =  $steam_id->ConvertToUInt64();
+								$history_item->target_name = null;
+								$history_item->target_steam_id = null;
 							} else {
 								$history_item->target_name = $history_item->source_name;
 								$history_item->target_steam_id = $history_item->source_steam_id;
@@ -365,16 +361,33 @@ class Feed {
 			}
 			
 			// Event code
-			$startQuote = mb_strpos($childNode->textContent, '"', null, 'UTF-8');
-			if (mb_strpos($childNode->textContent, '"', null, 'UTF-8') !== false) {
-				$endQuote = mb_strpos($childNode->textContent, '"', $startQuote + 1, 'UTF-8');
-				$eventName = mb_substr($childNode->textContent, $startQuote + 1, $endQuote - ($startQuote + 1), 'UTF-8');
+			//error_log($div->textContent);
+			$startQuote = mb_strpos($div->textContent, '"', null, 'UTF-8');
+			//error_log('SEARCH FOR EVENT STRING. QUOTE LOCATION? ' . $startQuote);
+			if ($startQuote !== false) {
+				$endQuote = mb_strpos($div->textContent, '"', $startQuote + 1, 'UTF-8');
+				//error_log('SEARCH FOR END OF EVENT STRING. QUOTE LOCATION? ' . $endQuote);
+				$eventName = mb_substr($div->textContent, $startQuote + 1, $endQuote - ($startQuote + 1), 'UTF-8');
+				//error_log('EVENT NAME DETERMINED: ' . $eventName);
 				$history_item->target_name = $eventName;
 			}
 			
+			if ($last_row != null && HistoryItem::compare($history_item, $last_row)) {
+				//error_log('MATCH FOUND' . $last_row->history_id);
+				$this->history_id = $last_row->history_id; //++
+				//error_log('NEXT ID ' . $this->history_id);
+				//$history_item->history_id = $this->history_id;
+				$last_row = null;
+				// Don't add a duplicate row once matched
+				continue;
+			}
+			
 			//error_log("HISTORY DETAILS: " . trim($doc->saveHtml($div)));
-
-			$history_items[] = $history_item;
+			
+			if ($last_row == null) {
+				error_log('LAST ROW IS NULL, ADD HISTORY ITEM ' . $history_item->history_id);
+				$history_items[] = $history_item;
+			}
 		}
 		
 		return $history_items;

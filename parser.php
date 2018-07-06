@@ -76,11 +76,11 @@ error_log("With total items..." . $total_items);
 // Was breaking parsing below
 //$history_items = $feed->ParsePage($doc);
 
-$content_cache = array();
-$history_cache = array();
+//$content_cache = array();
+//$history_cache = array();
 
-$located = false;
-$history_id = $last_row->history_id;
+$history_items = array();
+//$history_id = $last_row->history_id;
 for ($p = $last_page; $p > 0; $p--) {
 	//$curl->setHeader('Content-type', 'text/html; charset=UTF-8');
 	//$curl->setOpt(CURLOPT_ENCODING , 'UTF-8');
@@ -109,7 +109,7 @@ for ($p = $last_page; $p > 0; $p--) {
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 	error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
-	$content_cache[$p] = $content;
+	//$content_cache[$p] = $content;
 	error_log($content);
 	
 	$doc = new \DOMDocument('1.0', 'utf-8');
@@ -118,10 +118,17 @@ for ($p = $last_page; $p > 0; $p--) {
 	//file_put_contents('page' . $p . '.html', $doc->saveHTML());
 	//break;
 	
-	$history_items = $feed->ParsePage($doc);
-	$history_cache[$p] = $history_items;
+	if (count($history_items) == 0) {
+		error_log('HISTORY ITEMS = 0, SEARCH FOR HISTORY ITEM');
+		$history_items = $feed->ParsePage($doc, $last_row);
+	} else {
+		error_log('HISTORY ITEMS = ' . count($history_items) . ', INSERT INTO DATABASE');
+		$history_items = $feed->ParsePage($doc);
+	}
+	//$history_cache[$p] = $history_items;
 	
-	for ($i = 0; $i < count($history_items); $i++) {
+	
+	/*for ($i = 0; $i < count($history_items); $i++) {
 		$history_item = $history_items[$i];
 		if (HistoryItem::compare($history_item, $last_row)) {
 			$located = $i;
@@ -135,15 +142,16 @@ for ($p = $last_page; $p > 0; $p--) {
 		error_log(count($history_items));
 		$history_items = array_slice($history_items, $located + 1);
 		$located = true;
-	}
+	}*/
 	//print_r($history_items);
 	
-	if ($located === true) {
-		for ($i = 0; $i < count($history_items); $i++) {
+	if (count($history_items) > 0) {
+		error_log('INSERTING ' . count($history_items) . ' INTO DATABASE');
+		/*for ($i = 0; $i < count($history_items); $i++) {
 			$history_item = $history_items[$i];
 			$history_item->history_id = ++$history_id;
 			$feed->setHistoryID($history_id);
-		}
+		}*/
 		for ($i = 0; $i < count($history_items); $i++) {
 			$history_item = $history_items[$i];
 			//error_log("Inseting history item...");

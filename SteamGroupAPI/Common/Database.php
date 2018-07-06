@@ -81,7 +81,7 @@ class Database {
 			$stmt->bindParam(9, $history_item->time);
 			$stmt->bindParam(10, html_entity_decode($history_item->source_name));
 			$stmt->bindParam(11, $history_item->source_steam_id);
-			$stmt->bindParam(12, html_entity_decode($history_item->target_name));
+			$stmt->bindParam(12, strlen($history_item->target_name) > 0 ? html_entity_decode($history_item->target_name) : null);
 			$stmt->bindParam(13, $history_item->target_steam_id);
 			return $stmt->execute();
 		} catch (\PDOException $e) {
