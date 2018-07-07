@@ -33,7 +33,7 @@ class Database {
 		}
 	}
 	
-	public function getLastRow($group_id) {
+	public function getLastHistoryItem($group_id) {
 		try {
 			/* @var $this->instance \PDO */
 			/* @var $stmt \PDOStatement */

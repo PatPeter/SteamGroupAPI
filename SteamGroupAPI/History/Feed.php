@@ -1,18 +1,17 @@
 <?php
 namespace SteamGroupAPI\History;
 
-use SteamGroupAPI\Common\Core;
-use SteamGroupAPI\Common\SteamBase;
+//use \Curl\Curl;
+use \SteamGroupAPI\Common\Database;
+use \SteamGroupAPI\History\Feed;
+use \SteamGroupAPI\History\HistoryItem;
 
 class Feed {
-	const OFFSET = 2; // Offset for the time zone cURL fetches
-	
 	/**
 	 * 
 	 * Program Modified Connection Variables
 	 * 
 	 */
-	private $group = '';
 	private $group_id = null;
 	private $history_id = 0;
 	
@@ -130,9 +129,9 @@ class Feed {
 	 * @param $group The group's short URL.
 	 * @param $table The table to store and call data from.
 	 */
-	public function __construct($group, $table, $first_year) {
+	public function __construct($group_id, $first_year) {
+		$this->group_id = $group_id;
 		$this->first_year = $first_year;
-		// TODO: Generate group_id with XML cURL get
 	}
 	
 	public function __destruct() { }
@@ -199,59 +198,183 @@ class Feed {
 	}
 	
 	/**
+	 * get_last_page
+	 * 
+	 * 
+	 * @return $pages Number of pages for group history
+	 */
+	public function GetLastPage(\DOMDocument $doc) {
+		$xpath = new \DOMXPath($doc);
+		/* @var $elements \DOMNodeList */
+		$elements = $xpath->query("//*/a[@class='pagelink']");
+		/* @var $pagelink \DOMElement */
+		$pagelink = $elements->item($elements->length - 1);
+		return $pagelink->textContent;
+	}
+	
+	/**
+	 * get_item_count
+	 * 
+	 * 
+	 * @return The number of history items reported by the page.
+	 */
+	public function GetItemCount(\DOMDocument $doc) {
+		$xpath = new \DOMXPath($doc);
+		/* @var $elements \DOMNodeList */
+		$p = $xpath->query("//*/div[@class='group_paging']/p")->item(0);
+		/* @var $pagelink \DOMElement */
+		$parts = explode(' ', $p->textContent);
+		return $parts[4];
+	}
+	
+	/**
 	 * input_current
 	 * Function to input current history items.
 	 * 
 	 * 
 	 */
-	public function InputCurrent() {
-		$start_time = time();
-		echo "Started timer." . self::BR;
-		
-		$pages = $this->GetLastPage();
-		if ($pages == 0) {
-			echo "Could not fetch the number of pages: $pages";
-			curl_close($this->curlID);
-			$this->connection->close();
-			$this->__destruct();
-			return;
+	public function processPages(\Curl\Curl $curl) {
+		$db = Database::getInstance();
+		$last_row = $db->getLastHistoryItem($this->group_id);
+		var_dump($last_row);
+		if ($last_row == false) {
+			//$mysqli = new mysqli("", "", "", "");
+			//$result = $mysqli->query('SELECT * FROM group_history WHERE group_id = 103582791430024497 ORDER BY history_id DESC LIMIT 1');
+			//print_r($result->fetch_assoc());
+			error_log('No last row, populating a new group.');
+			$last_row = null;
 		}
-		
-		$id = $this->GetItemCount();
-		if ($id == 0) {
-			echo "Could not fetch the number of history items: $id";
-			curl_close($this->curlID);
-			$this->connection->close();
-			$this->__destruct();
-			return;
-		}
-		
-		//mysql_select_db($this->database,$this->connection)
-		//	or die("Cannot select database!");
-		//mysql_query("TRUNCATE TABLE `$this->table`",$this->connection);
-		$result = mysql_query("SELECT * FROM $this->table", $this->connection)
-			or die(mysql_error());
-		$num_rows = mysql_num_rows($result);
-		//echo $num_rows;
-		
-		if ($num_rows == 0) {
-			$page = 1;
-			$history_item = new HistoryItem();
-			while ($page <= $pages) {
-				echo "Parsing page $page." . self::BR;
-				$this->ParsePage($page,$id,$history_item);
-				$page++;
-			}
-		} else {
-			echo "Table not empty, cannot input data." . self::BR;
-		}
-		$end_time = time();
-		date_default_timezone_set("America/Chicago");
-		# 0000-01-01 00:00:00 - 62167197600; 0001-01-01 00:00:00" - 62135575200
-		echo "Parsing the Steam group history page and inserting it into the database took " . date("H:i:s",$end_time - $start_time - 62167197600) . ".";
 
-		mysql_close($this->connection);
-		curl_close($this->curlID);
+		$history_url = 'https://steamcommunity.com/groups/unigamia/history';
+		$curl->setHeader('Content-type', 'text/html; charset=UTF-8');
+		//$curl->setOpt(CURLOPT_ENCODING , 'UTF-8');
+		$content = $curl->get($history_url);
+		//$content = utf8_decode($content);
+		//error_log($content);
+
+		$doc = new \DOMDocument('1.0', 'utf-8');
+		//$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");
+		$content  = mb_convert_encoding($content , 'HTML-ENTITIES', 'UTF-8');
+		@$doc->loadHTML($content);
+
+		//error_log($content);
+
+		/*
+		INSERT INTO uga_libsteam.group_history 
+		SELECT 103582791430024497, id, `type`, title, date, 
+		DATE_FORMAT(date, '%Y') - 2009, DATE_FORMAT(date, '%m'), DATE_FORMAT(date, '%d'), DATE_FORMAT(date,'%H:%i:%s'),
+		source, sourceID, target, targetID
+		FROM uga_libsteam.uga;
+
+		SET SQL_SAFE_UPDATES = FALSE;
+		UPDATE uga_libsteam.group_history SET
+		  source_name = CONVERT(CAST(CONVERT(source_name USING 'latin1') AS BINARY) USING 'utf8mb4'),
+		  target_name = CONVERT(CAST(CONVERT(target_name USING 'latin1') AS BINARY) USING 'utf8mb4')
+		  WHERE history_id != 440;
+		 */
+		//$history_item = new HistoryItem();
+		//$page_number = 23;
+
+		$last_page = $this->GetLastPage($doc);
+		if (!is_numeric($last_page)) {
+			die('Last page could not be detected! Exiting.');
+		}
+
+		error_log("Starting from last page..." . $last_page);
+
+		$total_items = $this->GetItemCount($doc);
+
+		error_log("With total items..." . $total_items);
+
+		// Was breaking parsing below
+		//$history_items = $feed->ParsePage($doc);
+
+		//$content_cache = array();
+		//$history_cache = array();
+
+		$history_items = array();
+		//$history_id = $last_row->history_id;
+		for ($p = $last_page; $p > 0; $p--) {
+			//$curl->setHeader('Content-type', 'text/html; charset=UTF-8');
+			//$curl->setOpt(CURLOPT_ENCODING , 'UTF-8');
+			$content = $curl->get($history_url . '?p=' . $p);
+			$content  = mb_convert_encoding($content , 'HTML-ENTITIES', 'UTF-8');
+			//$content = utf8_decode($content);
+			//$content = iconv('ISO-8859-1', 'UTF-8', $content);
+			file_put_contents("page" . $p.'.html', $content);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
+			//$content_cache[$p] = $content;
+			error_log($content);
+
+			$doc = new \DOMDocument('1.0', 'utf-8');
+			//$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");
+			@$doc->loadHTML($content);
+			//file_put_contents('page' . $p . '.html', $doc->saveHTML());
+			//break;
+
+			if (count($history_items) == 0) {
+				error_log('HISTORY ITEMS = 0, SEARCH FOR HISTORY ITEM');
+				$history_items = $feed->ParsePage($doc, $last_row);
+			} else {
+				error_log('HISTORY ITEMS = ' . count($history_items) . ', INSERT INTO DATABASE');
+				$history_items = $feed->ParsePage($doc);
+			}
+			//$history_cache[$p] = $history_items;
+
+
+			/*for ($i = 0; $i < count($history_items); $i++) {
+				$history_item = $history_items[$i];
+				if (HistoryItem::compare($history_item, $last_row)) {
+					$located = $i;
+					break;
+				}
+			}
+
+			if (is_numeric($located)) {
+				error_log("LOCATED");
+				error_log($located);
+				error_log(count($history_items));
+				$history_items = array_slice($history_items, $located + 1);
+				$located = true;
+			}*/
+			//print_r($history_items);
+
+			if (count($history_items) > 0) {
+				error_log('INSERTING ' . count($history_items) . ' INTO DATABASE');
+				/*for ($i = 0; $i < count($history_items); $i++) {
+					$history_item = $history_items[$i];
+					$history_item->history_id = ++$history_id;
+					$feed->setHistoryID($history_id);
+				}*/
+				for ($i = 0; $i < count($history_items); $i++) {
+					$history_item = $history_items[$i];
+					//error_log("Inseting history item...");
+					//print_r($history_item);
+					$db->insertHistoryItem($history_item);
+				}
+			}
+		}
+		
+		return true;
 	}
 	
 	/**
@@ -277,7 +400,7 @@ class Feed {
 			/* @var $div \DOMElement */
 			$div = $divs->item($i);
 			$history_item = new HistoryItem();
-			$history_item->group_id = "103582791430024497";
+			$history_item->group_id = $this->group_id;
 			if ($last_row == null) {
 				$history_item->history_id = ++$this->history_id;
 			}
@@ -391,35 +514,5 @@ class Feed {
 		}
 		
 		return $history_items;
-	}
-	
-	/**
-	 * get_last_page
-	 * 
-	 * 
-	 * @return $pages Number of pages for group history
-	 */
-	public function GetLastPage(\DOMDocument $doc) {
-		$xpath = new \DOMXPath($doc);
-		/* @var $elements \DOMNodeList */
-		$elements = $xpath->query("//*/a[@class='pagelink']");
-		/* @var $pagelink \DOMElement */
-		$pagelink = $elements->item($elements->length - 1);
-		return $pagelink->textContent;
-	}
-	
-	/**
-	 * get_item_count
-	 * 
-	 * 
-	 * @return The number of history items reported by the page.
-	 */
-	public function GetItemCount(\DOMDocument $doc) {
-		$xpath = new \DOMXPath($doc);
-		/* @var $elements \DOMNodeList */
-		$p = $xpath->query("//*/div[@class='group_paging']/p")->item(0);
-		/* @var $pagelink \DOMElement */
-		$parts = explode(' ', $p->textContent);
-		return $parts[4];
 	}
 }

@@ -8,21 +8,11 @@ class Core {
     private $optArray;
 
     public function __construct() {
-            $this->id = curl_init();
-            $this->optArray = array(
-                    CURLOPT_RETURNTRANSFER => 1,      // return web page
-                    CURLOPT_HEADER         => false, // Do not return headers
-                    CURLOPT_FOLLOWLOCATION => true,  // follow redirects
-                    CURLOPT_AUTOREFERER    => true,     // set referer on redirect
-                    CURLOPT_CONNECTTIMEOUT => 120,      // timeout on connect
-                    CURLOPT_TIMEOUT        => 120,      // timeout on response
-                    CURLOPT_MAXREDIRS      => 10,       // stop after 10 redirects
-            );
-            curl_setopt_array($this->id,$this->optArray);
+        
     }
 
     public function __destruct() {
-            //curl_close($this->id);
+		
     }
 
     /**
