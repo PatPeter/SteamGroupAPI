@@ -2,6 +2,7 @@
 namespace SteamGroupAPI\History;
 
 //use \Curl\Curl;
+use \SteamGroupAPI\Common\Core;
 use \SteamGroupAPI\Common\Database;
 use \SteamGroupAPI\History\HistoryItem;
 
@@ -11,6 +12,7 @@ class Feed {
 	 * Program Modified Connection Variables
 	 * 
 	 */
+	private $group_custom_url = '';
 	private $group_id = null;
 	private $history_id = 0;
 	
@@ -57,7 +59,7 @@ class Feed {
 		'New Officer',			# 03 // Target left, Source right
 		'Officer Demoted',		# 04 // Target left, Source right
 		'Member Dropped',		# 05 // Target left, Source right
-		'',						# 06
+		'Group Created',		# 06
 		'Invite Sent',			# 07 // Target left, Source right
 		'New Event',			# 08 // No URL Target left, Source right
 		'Event Updated',		# 09 // No URL Target left, Source right
@@ -66,7 +68,7 @@ class Feed {
 		'New Announcement',		# 12 // Source only
 		'Announcement Updated',	# 13 // Source only
 		'Announcement Deleted',	# 14 // Source only
-		'',						# 15
+		'POTW Change',			# 15
 		'Profile Change',		# 16 // web links     // Source only
 		'Profile Change',		# 17 // group details // Source only
 		'',						# 18
@@ -76,7 +78,7 @@ class Feed {
 		'Type Changed',			# 22 // public  // Source only
 		'Type Changed',			# 23 // private // Source only
 		'',						# 24
-		'',						# 25
+		'Chat Access',			# 25
 		'',						# 26
 		'',						# 27
 		'New Moderator',		# 28 // Target left, source right
@@ -92,7 +94,7 @@ class Feed {
 		' was promoted to officer by ',									# 03
 		' was demoted to member by ',									# 04
 		' was kicked from the group by ',								# 05
-		'',																# 06
+		'group was created',											# 06
 		' was sent an invitation by ',									# 07
 		' event was created by ',										# 08
 		' event was updated by ',										# 09
@@ -101,7 +103,7 @@ class Feed {
 		'announcement was created by ',									# 12
 		'announcement was updated by ',									# 13
 		'announcement was deleted by ',									# 14
-		'',																# 15
+		' changed the Player of the Week',								# 15
 		' changed group web links',										# 16
 		' changed group details',										# 17
 		'',																# 18
@@ -128,8 +130,8 @@ class Feed {
 	 * @param $group The group's short URL.
 	 * @param $table The table to store and call data from.
 	 */
-	public function __construct($group_id, $first_year) {
-		$this->group_id = $group_id;
+	public function __construct($group_custom_url, $first_year) {
+		$this->group_custom_url = $group_custom_url;
 		$this->first_year = $first_year;
 	}
 	
@@ -233,6 +235,13 @@ class Feed {
 	 * 
 	 */
 	public function processPages(\Curl\Curl $curl) {
+		$group_information = Core::getGroupInfo($curl, $this->group_custom_url);
+		$this->group_id = $group_information['groupID64'];
+		var_dump($group_information);
+		if ($this->group_id == false) {
+			die('Group ID was not fetched.');
+		}
+		
 		$db = Database::getInstance();
 		$last_row = $db->getLastHistoryItem($this->group_id);
 		var_dump($last_row);
@@ -244,7 +253,7 @@ class Feed {
 			$last_row = null;
 		}
 
-		$history_url = 'https://steamcommunity.com/groups/unigamia/history';
+		$history_url = "https://steamcommunity.com/groups/$this->group_custom_url/history";
 		$curl->setHeader('Content-type', 'text/html; charset=UTF-8');
 		//$curl->setOpt(CURLOPT_ENCODING , 'UTF-8');
 		$content = $curl->get($history_url);
@@ -256,7 +265,7 @@ class Feed {
 		$content  = mb_convert_encoding($content , 'HTML-ENTITIES', 'UTF-8');
 		@$doc->loadHTML($content);
 
-		//error_log($content);
+		error_log($content);
 
 		/*
 		INSERT INTO uga_libsteam.group_history 
@@ -300,7 +309,7 @@ class Feed {
 			$content  = mb_convert_encoding($content , 'HTML-ENTITIES', 'UTF-8');
 			//$content = utf8_decode($content);
 			//$content = iconv('ISO-8859-1', 'UTF-8', $content);
-			file_put_contents("page" . $p.'.html', $content);
+			//file_put_contents("page" . $p.'.html', $content);
 			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
@@ -322,7 +331,7 @@ class Feed {
 			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 			error_log('GET URL: ' . $history_url . '?p=' . $p . ' from ' . $last_page);
 			//$content_cache[$p] = $content;
-			error_log($content);
+			//error_log($content);
 
 			$doc = new \DOMDocument('1.0', 'utf-8');
 			//$doc->loadHtmlFile("Steam Community   Group   Universal Gaming Alliance   Page 13.html");

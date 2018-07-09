@@ -87,6 +87,7 @@ class Database {
 		} catch (\PDOException $e) {
 			print_r($e->getMessage());
 			print_r($e->getTraceAsString());
+			print_r($history_item);
 			die();
 		}
 	}
