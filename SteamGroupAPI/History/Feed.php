@@ -3,7 +3,6 @@ namespace SteamGroupAPI\History;
 
 //use \Curl\Curl;
 use \SteamGroupAPI\Common\Database;
-use \SteamGroupAPI\History\Feed;
 use \SteamGroupAPI\History\HistoryItem;
 
 class Feed {
@@ -203,7 +202,7 @@ class Feed {
 	 * 
 	 * @return $pages Number of pages for group history
 	 */
-	public function GetLastPage(\DOMDocument $doc) {
+	public function getLastPage(\DOMDocument $doc) {
 		$xpath = new \DOMXPath($doc);
 		/* @var $elements \DOMNodeList */
 		$elements = $xpath->query("//*/a[@class='pagelink']");
@@ -218,7 +217,7 @@ class Feed {
 	 * 
 	 * @return The number of history items reported by the page.
 	 */
-	public function GetItemCount(\DOMDocument $doc) {
+	public function getItemCount(\DOMDocument $doc) {
 		$xpath = new \DOMXPath($doc);
 		/* @var $elements \DOMNodeList */
 		$p = $xpath->query("//*/div[@class='group_paging']/p")->item(0);
@@ -275,19 +274,19 @@ class Feed {
 		//$history_item = new HistoryItem();
 		//$page_number = 23;
 
-		$last_page = $this->GetLastPage($doc);
+		$last_page = $this->getLastPage($doc);
 		if (!is_numeric($last_page)) {
 			die('Last page could not be detected! Exiting.');
 		}
 
 		error_log("Starting from last page..." . $last_page);
 
-		$total_items = $this->GetItemCount($doc);
+		$total_items = $this->getItemCount($doc);
 
 		error_log("With total items..." . $total_items);
 
 		// Was breaking parsing below
-		//$history_items = $feed->ParsePage($doc);
+		//$history_items = $this->parsePage($doc);
 
 		//$content_cache = array();
 		//$history_cache = array();
@@ -333,10 +332,10 @@ class Feed {
 
 			if (count($history_items) == 0) {
 				error_log('HISTORY ITEMS = 0, SEARCH FOR HISTORY ITEM');
-				$history_items = $feed->ParsePage($doc, $last_row);
+				$history_items = $this->parsePage($doc, $last_row);
 			} else {
 				error_log('HISTORY ITEMS = ' . count($history_items) . ', INSERT INTO DATABASE');
-				$history_items = $feed->ParsePage($doc);
+				$history_items = $this->parsePage($doc);
 			}
 			//$history_cache[$p] = $history_items;
 
@@ -363,7 +362,7 @@ class Feed {
 				/*for ($i = 0; $i < count($history_items); $i++) {
 					$history_item = $history_items[$i];
 					$history_item->history_id = ++$history_id;
-					$feed->setHistoryID($history_id);
+					$this->setHistoryID($history_id);
 				}*/
 				for ($i = 0; $i < count($history_items); $i++) {
 					$history_item = $history_items[$i];
@@ -377,17 +376,7 @@ class Feed {
 		return true;
 	}
 	
-	/**
-	 * 
-	 * 
-	 * 
-	 * 
-	 */
-	public function Update(\DOMDocument $doc, $history_items) {
-		
-	}
-	
-	public function ParsePage(\DOMDocument $doc, &$last_row = null) { // http://www.php.net/manual/en/language.references.pass.php
+	public function parsePage(\DOMDocument $doc, &$last_row = null) { // http://www.php.net/manual/en/language.references.pass.php
 		$history_items = array();
 
 		$xpath = new \DOMXPath($doc);
