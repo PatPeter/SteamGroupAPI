@@ -13,6 +13,14 @@ class Authentication {
 		$donotcache = round(microtime(true)*1000);
 		// Define class Curl() in variable $curl
 		$curl = new Curl();
+		$curl->xmlDecoder = function($response)
+		{
+			$xml_obj = @simplexml_load_string($response, null, LIBXML_NOCDATA);
+			if (!($xml_obj === false)) {
+				$response = $xml_obj;
+			}
+			return $response;
+		};
 		$curl->setCookieJar(sys_get_temp_dir() . '/cookies.txt');
 		$curl->setCookieFile(sys_get_temp_dir() . '/cookies.txt');
 		file_put_contents(sys_get_temp_dir() . '/cookies.txt', 'steamcommunity.com	FALSE	/	FALSE	0	timezoneOffset	-18000,0', FILE_APPEND | LOCK_EX, null);

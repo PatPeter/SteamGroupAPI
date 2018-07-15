@@ -16,12 +16,12 @@ if ($argc != 5) {
 //$content = file_get_contents("Steam Community __ Group __ Universal Gaming Alliance.html");
 //echo $content;
 
-$curl = Authentication::login($argv[1], $argv[2]);
+$curl = Authentication::login($argv[3], $argv[4]);
 if ($curl === false || !Authentication::is_logged($curl)) {
 	die("Could not log into Steam.");
 }
 
 date_default_timezone_set('America/Chicago');
 
-$feed = new Feed($argv[3], $argv[4]);
+$feed = new Feed($argv[1], $argv[2]);
 $feed->processPages($curl);

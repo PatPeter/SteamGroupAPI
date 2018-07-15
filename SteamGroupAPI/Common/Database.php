@@ -4,11 +4,11 @@ namespace SteamGroupAPI\Common;
 use SteamGroupAPI\History\HistoryItem;
 
 class Database {
-	private $hostname = 'localhost';
-	private $port	  = '3306';
-	private $username = '';
-	private $password = '';
-	private $database = 'uga_libsteam';
+	private $hostname = STEAM_GROUP_API_PDO_HOSTNAME;
+	private $port	  = STEAM_GROUP_API_PDO_PORT;
+	private $username = STEAM_GROUP_API_PDO_USERNAME;
+	private $password = STEAM_GROUP_API_PDO_PASSWORD;
+	private $database = STEAM_GROUP_API_PDO_DATABASE;
 	
 	/* @var $pdo \PDO */
 	public $pdo = null;
@@ -33,6 +33,62 @@ class Database {
 		}
 	}
 	
+	/**
+	 * 
+	 * @param type $group_id
+	 * @return \SteamGroupAPI\Common\SteamGroup
+	 */
+	public function getSteamGroup($group_id) {
+		try {
+			$stmt = $this->pdo->prepare('SELECT * FROM steam_group WHERE id = ?', array(\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION));
+			if ($stmt === false) {
+				error_log($this->pdo->errorCode());
+				error_log($this->pdo->errorInfo());
+			}
+			$stmt->bindParam(1, $group_id);
+			$stmt->setFetchMode(\PDO::FETCH_CLASS, '\SteamGroupAPI\Common\SteamGroup');
+			$stmt->execute([$group_id]);
+			$last_row = $stmt->fetch();
+			if ($last_row === false) {
+				error_log($this->pdo->errorCode());
+				print_r($this->pdo->errorInfo());
+				return null;
+			}
+			return $last_row;
+		} catch (\PDOException $e) {
+			print_r($e->getMessage());
+			print_r($e->getTraceAsString());
+			die();
+		}
+	}
+	
+	public function insertSteamGroup(\SteamGroupAPI\Common\SteamGroup $steam_group) {
+		try {
+			/* @var $this->instance \PDO */
+			/* @var $stmt \PDOStatement */
+			$stmt = $this->pdo->prepare('INSERT INTO steam_group VALUES (?, ?, ?)', array(\PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION));
+			//var_dump($stmt);
+			if ($stmt === false) {
+				error_log($this->pdo->errorCode());
+				error_log($this->pdo->errorInfo());
+			}
+			$stmt->bindParam(1, $steam_group->id);
+			$stmt->bindParam(2, $steam_group->custom_url);
+			$stmt->bindParam(3, $steam_group->name);
+			return $stmt->execute();
+		} catch (\PDOException $e) {
+			print_r($e->getMessage());
+			print_r($e->getTraceAsString());
+			print_r($steam_group);
+			die();
+		}
+	}
+	
+	/**
+	 * 
+	 * @param type $group_id
+	 * @return \SteamGroupAPI\
+	 */
 	public function getLastHistoryItem($group_id) {
 		try {
 			/* @var $this->instance \PDO */
@@ -51,6 +107,7 @@ class Database {
 			if ($last_row === false) {
 				error_log($this->pdo->errorCode());
 				print_r($this->pdo->errorInfo());
+				return null;
 			}
 			return $last_row;
 		} catch (\PDOException $e) {
@@ -92,4 +149,3 @@ class Database {
 		}
 	}
 }
-//Date Created: 2012-06-19 11:57 AM

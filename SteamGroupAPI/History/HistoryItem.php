@@ -11,8 +11,8 @@ class HistoryItem {
 	public $month;
 	public $day;
 	public $time;
-	public $source_name = ''; // derived from Steam ID
-	public $source_steam_id = '';
+	public $source_name = null; // derived from Steam ID
+	public $source_steam_id = null;
 	public $target_name = null; // derived from Steam ID
 	public $target_steam_id = null;
 	
@@ -31,10 +31,10 @@ class HistoryItem {
 			error_log('type_id: ' . $a->type_id . ' != ' . $b->type_id);
 			return false;
 		}
-		if ((int) $a->year_offset != (int) $b->year_offset) {
+		/*if ((int) $a->year_offset != (int) $b->year_offset) {
 			error_log('year_offset: ' . $a->year_offset . ' != ' . $b->year_offset);
 			return false;
-		}
+		}*/
 		if ((int) $a->month != (int) $b->month) {
 			error_log('month: ' . $a->month . ' != ' . $b->month);
 			return false;

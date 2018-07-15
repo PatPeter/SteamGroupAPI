@@ -5,6 +5,7 @@ namespace SteamGroupAPI\History;
 use \SteamGroupAPI\Common\Core;
 use \SteamGroupAPI\Common\Database;
 use \SteamGroupAPI\History\HistoryItem;
+use \SteamGroupAPI\Common\SteamGroup;
 
 class Feed {
 	/**
@@ -79,8 +80,8 @@ class Feed {
 		'Type Changed',			# 23 // private // Source only
 		'',						# 24
 		'Chat Access',			# 25
-		'',						# 26
-		'',						# 27
+		'Chat Access',						# 26
+		'Chat Access',						# 27
 		'New Moderator',		# 28 // Target left, source right
 		'',						# 29
 		'',						# 30
@@ -113,9 +114,9 @@ class Feed {
 		'Group was changed into a public group by ',					# 22
 		'Group was changed into an invite-only group by ',				# 23
 		'',																# 24
-		'',																# 25
-		'',																# 26
-		'',																# 27
+		' was kicked from chat by ',									# 25
+		' was banned from chat by ',									# 26
+		' was un-banned from chat by ',									# 27
 		' was promoted to moderator by ',								# 28
 		'',																# 29
 		'',																# 30
@@ -242,7 +243,17 @@ class Feed {
 			die('Group ID was not fetched.');
 		}
 		
+		/* @var $db \SteamGroupAPI\Common\Database */
 		$db = Database::getInstance();
+		$steam_group = $db->getSteamGroup($group_information['groupID64']);
+		if ($steam_group == null) {
+			$steam_group = new SteamGroup();
+			$steam_group->id = $group_information['groupID64'];
+			$steam_group->custom_url = $group_information['groupDetails']['groupURL'];
+			$steam_group->name = $group_information['groupDetails']['groupName'];
+		}
+		$db->insertSteamGroup($steam_group);
+		
 		$last_row = $db->getLastHistoryItem($this->group_id);
 		var_dump($last_row);
 		if ($last_row == false) {
@@ -496,6 +507,7 @@ class Feed {
 			if ($last_row != null && HistoryItem::compare($history_item, $last_row)) {
 				//error_log('MATCH FOUND' . $last_row->history_id);
 				$this->history_id = $last_row->history_id; //++
+				$this->year_offset = $last_row->year_offset;
 				//error_log('NEXT ID ' . $this->history_id);
 				//$history_item->history_id = $this->history_id;
 				$last_row = null;

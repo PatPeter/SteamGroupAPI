@@ -1,4 +1,5 @@
 <?php
+require('Configuration.php');
 set_include_path(get_include_path() . '.');
 
 spl_autoload_register(function($class) {
